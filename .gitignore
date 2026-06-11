@@ -1,0 +1,8 @@
+node_modules/
+out/
+dist/
+*.vsix
+.vscode-test/
+.agent-room/transcripts/
+.agent-room/cache/
+npm-debug.log*

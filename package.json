@@ -1,0 +1,292 @@
+{
+  "name": "agent-room",
+  "displayName": "Agent Room",
+  "description": "A professional VS Code multi-agent coding room. Coordinate Claude Code, Codex CLI, and optional web research as named virtual team members with roles and workflows — in one native chat panel, with no terminal spam.",
+  "version": "0.0.1",
+  "publisher": "agent-room-publisher-placeholder",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "codex",
+    "agents",
+    "multi-agent",
+    "chat"
+  ],
+  "main": "./out/src/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "agentRoom.open", "title": "Agent Room: Open" },
+      { "command": "agentRoom.checkCliHealth", "title": "Agent Room: Check CLI Health" },
+      { "command": "agentRoom.openRoomSetup", "title": "Agent Room: Open Room Setup" },
+      { "command": "agentRoom.resetRoleAssignments", "title": "Agent Room: Reset Role Assignments" },
+      { "command": "agentRoom.exportRoomProfile", "title": "Agent Room: Export Room Profile" },
+      { "command": "agentRoom.importRoomProfile", "title": "Agent Room: Import Room Profile" },
+      { "command": "agentRoom.sendCurrentSelectionToAtlas", "title": "Agent Room: Send Current Selection to Atlas" },
+      { "command": "agentRoom.sendCurrentSelectionToForge", "title": "Agent Room: Send Current Selection to Forge" },
+      { "command": "agentRoom.sendCurrentSelectionToSentinel", "title": "Agent Room: Send Current Selection to Sentinel" },
+      { "command": "agentRoom.sendCurrentSelectionToGauge", "title": "Agent Room: Send Current Selection to Gauge" },
+      { "command": "agentRoom.sendCurrentSelectionToScout", "title": "Agent Room: Send Current Selection to Scout" },
+      { "command": "agentRoom.sendSelectionToAssignedPlanner", "title": "Agent Room: Send Current Selection to Assigned Planner" },
+      { "command": "agentRoom.sendSelectionToAssignedCoder", "title": "Agent Room: Send Current Selection to Assigned Coder" },
+      { "command": "agentRoom.sendSelectionToAssignedReviewer", "title": "Agent Room: Send Current Selection to Assigned Reviewer" },
+      { "command": "agentRoom.runPlanningWorkflowOnCurrentFile", "title": "Agent Room: Run Planning Workflow on Current File" },
+      { "command": "agentRoom.runFullBuildCycleOnCurrentFile", "title": "Agent Room: Run Full Build Cycle on Current File" },
+      { "command": "agentRoom.exportTranscript", "title": "Agent Room: Export Transcript" },
+      { "command": "agentRoom.clearTranscript", "title": "Agent Room: Clear Transcript" },
+      { "command": "agentRoom.openSettings", "title": "Agent Room: Open Settings" }
+    ],
+    "configuration": {
+      "title": "Agent Room",
+      "properties": {
+        "agentRoom.claude.executable": {
+          "type": "string",
+          "default": "claude",
+          "description": "Executable used for the Claude Code CLI provider."
+        },
+        "agentRoom.codex.executable": {
+          "type": "string",
+          "default": "codex",
+          "description": "Executable used for the Codex CLI provider."
+        },
+        "agentRoom.defaultWorkflow": {
+          "type": "string",
+          "default": "manual",
+          "description": "Workflow selected by default when the room opens."
+        },
+        "agentRoom.defaultContextMode": {
+          "type": "string",
+          "enum": ["currentPromptOnly", "transcriptSummary", "lastMessages", "fullTranscriptBudgeted"],
+          "default": "lastMessages",
+          "description": "How much transcript context is included in each agent turn."
+        },
+        "agentRoom.lastMessagesCount": {
+          "type": "number",
+          "default": 10,
+          "description": "Number of recent messages included when context mode is lastMessages."
+        },
+        "agentRoom.maxTranscriptChars": {
+          "type": "number",
+          "default": 60000,
+          "description": "Maximum transcript characters included in a prompt before truncation."
+        },
+        "agentRoom.maxPromptChars": {
+          "type": "number",
+          "default": 120000,
+          "description": "Hard upper bound for a single prompt sent to a provider."
+        },
+        "agentRoom.agentTimeoutSeconds": {
+          "type": "number",
+          "default": 600,
+          "description": "Timeout for a single agent turn, in seconds."
+        },
+        "agentRoom.healthCheckTimeoutSeconds": {
+          "type": "number",
+          "default": 10,
+          "description": "Timeout for each health check command, in seconds."
+        },
+        "agentRoom.claude.preferStreamJson": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prefer Claude Code stream-json output when the CLI supports it."
+        },
+        "agentRoom.claude.preferJson": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prefer Claude Code json output when stream-json is unavailable."
+        },
+        "agentRoom.codex.useJson": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prefer Codex CLI JSONL output when the CLI supports it."
+        },
+        "agentRoom.codex.sandbox": {
+          "type": "string",
+          "enum": ["read-only", "workspace-write"],
+          "default": "workspace-write",
+          "description": "Sandbox mode passed to Codex CLI when supported."
+        },
+        "agentRoom.codex.approval": {
+          "type": "string",
+          "enum": ["untrusted", "on-request", "never"],
+          "default": "on-request",
+          "description": "Approval policy passed to Codex CLI when supported."
+        },
+        "agentRoom.enableDangerousModes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow dangerous provider modes (bypass sandbox/approvals). Off by default. Requires explicit per-run confirmation even when enabled."
+        },
+        "agentRoom.transcriptStorage": {
+          "type": "string",
+          "enum": ["memory", "workspace", "global"],
+          "default": "workspace",
+          "description": "Where transcripts are stored."
+        },
+        "agentRoom.roomProfileStorage": {
+          "type": "string",
+          "enum": ["workspace", "global"],
+          "default": "workspace",
+          "description": "Where the room profile (team, roles, workflows) is stored."
+        },
+        "agentRoom.showRawAgentEvents": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include raw parsed provider events in message diagnostics."
+        },
+        "agentRoom.extraRoomInstructions": {
+          "type": "string",
+          "default": "",
+          "description": "Extra instructions appended to every agent prompt for this room."
+        },
+        "agentRoom.includeGitStatusByDefault": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include a short git status summary in agent prompts by default."
+        },
+        "agentRoom.includeCurrentFileByDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include the active editor file contents in agent prompts by default."
+        },
+        "agentRoom.includeSelectionByDefault": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include the current editor selection in agent prompts by default."
+        },
+        "agentRoom.logging.level": {
+          "type": "string",
+          "enum": ["error", "info", "debug", "trace"],
+          "default": "error",
+          "description": "Logging level for the Agent Room output channel."
+        },
+        "agentRoom.modelAdvisor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Conductor recommendations for workflow, agents, and model tiers."
+        },
+        "agentRoom.modelAdvisor.autoApply": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically apply Model Advisor recommendations (still confirms higher-usage tiers)."
+        },
+        "agentRoom.modelAdvisor.showReasoning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Model Advisor's reasoning with each recommendation."
+        },
+        "agentRoom.modelAdvisor.preferLowerCost": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bias recommendations toward lower-cost model tiers."
+        },
+        "agentRoom.modelAdvisor.preferSpeed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Bias recommendations toward faster model tiers."
+        },
+        "agentRoom.modelAdvisor.preferQuality": {
+          "type": "boolean",
+          "default": false,
+          "description": "Bias recommendations toward deeper model tiers."
+        },
+        "agentRoom.modelAdvisor.confirmBeforeDeepReasoning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before running deep-reasoning model tiers."
+        },
+        "agentRoom.models.claude.fast": { "type": "string", "default": "", "description": "Concrete Claude model for the fast tier. Empty = provider default." },
+        "agentRoom.models.claude.balanced": { "type": "string", "default": "", "description": "Concrete Claude model for the balanced tier. Empty = provider default." },
+        "agentRoom.models.claude.deepReasoning": { "type": "string", "default": "", "description": "Concrete Claude model for the deepReasoning tier. Empty = provider default." },
+        "agentRoom.models.claude.coding": { "type": "string", "default": "", "description": "Concrete Claude model for the coding tier. Empty = provider default." },
+        "agentRoom.models.codex.fast": { "type": "string", "default": "", "description": "Concrete Codex model for the fast tier. Empty = provider default." },
+        "agentRoom.models.codex.balanced": { "type": "string", "default": "", "description": "Concrete Codex model for the balanced tier. Empty = provider default." },
+        "agentRoom.models.codex.deepReasoning": { "type": "string", "default": "", "description": "Concrete Codex model for the deepReasoning tier. Empty = provider default." },
+        "agentRoom.models.codex.coding": { "type": "string", "default": "", "description": "Concrete Codex model for the coding tier. Empty = provider default." },
+        "agentRoom.models.openAiWebSearch.research": { "type": "string", "default": "", "description": "OpenAI model used by the optional Web Research provider. Empty = not configured." },
+        "agentRoom.webResearch.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the optional OpenAI Web Search provider (Scout). Requires your own OpenAI API key."
+        },
+        "agentRoom.webResearch.provider": {
+          "type": "string",
+          "default": "openAiWebSearch",
+          "description": "Web research provider id."
+        },
+        "agentRoom.webResearch.model": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI model used for web research. Must be set by you; Agent Room does not assume model availability."
+        },
+        "agentRoom.webResearch.apiKeySource": {
+          "type": "string",
+          "enum": ["environment", "vscodeSecretStorage"],
+          "default": "environment",
+          "description": "Where the user-owned OpenAI API key for web research is read from."
+        },
+        "agentRoom.webResearch.apiKeyEnvironmentVariable": {
+          "type": "string",
+          "default": "OPENAI_API_KEY",
+          "description": "Environment variable holding the OpenAI API key when apiKeySource is environment."
+        },
+        "agentRoom.webResearch.maxResults": {
+          "type": "number",
+          "default": 5,
+          "description": "Maximum number of sources Scout should cite."
+        },
+        "agentRoom.webResearch.requireCitations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require Scout to provide source links."
+        },
+        "agentRoom.webResearch.onlyWhenRequested": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only run web research when explicitly requested or routed to Scout."
+        },
+        "agentRoom.webResearch.allowedDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "If non-empty, Scout is instructed to prefer these domains."
+        },
+        "agentRoom.webResearch.blockedDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Domains Scout is instructed to avoid."
+        },
+        "agentRoom.webResearch.searchFreshness": {
+          "type": "string",
+          "enum": ["auto", "latest", "stableDocs"],
+          "default": "auto",
+          "description": "Freshness preference for web research."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src test",
+    "test": "npm run compile && node --test out/test/unit/"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.9.0",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.2.0"
+  }
+}

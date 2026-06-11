@@ -77,9 +77,9 @@ export class ModelAdvisor {
     const lower = text.toLowerCase();
     if (/(latest|current|docs|documentation|source|web|research)/.test(lower)) return "webResearch";
     if (/(security|audit|vulnerability|secret|credential|injection)/.test(lower)) return "securityReview";
+    if (/(build|implement|create|add|fix|complete|extension|feature)/.test(lower)) return "fullBuildCycle";
     if (/(test|coverage|verify|qa)/.test(lower)) return "testing";
     if (/(review|critique|inspect)/.test(lower)) return "adversarialReview";
-    if (/(build|implement|create|add|fix|complete|extension|feature)/.test(lower)) return "fullBuildCycle";
     if (/(plan|architecture|design)/.test(lower)) return "planning";
     return "quickQuestion";
   }

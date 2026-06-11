@@ -1,0 +1,334 @@
+:root {
+  color-scheme: light dark;
+  --room-border: var(--vscode-panel-border, #3c3c3c);
+  --room-muted: var(--vscode-descriptionForeground);
+  --room-bg-subtle: var(--vscode-sideBar-background);
+  --room-bg-panel: var(--vscode-editor-background);
+  --room-accent: var(--vscode-focusBorder);
+  --room-good: var(--vscode-testing-iconPassed, #4caf50);
+  --room-warn: var(--vscode-testing-iconQueued, #c69026);
+  --room-bad: var(--vscode-testing-iconFailed, #f14c4c);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+button,
+select,
+textarea,
+input {
+  font: inherit;
+}
+
+button,
+select {
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  min-height: 28px;
+  padding: 3px 10px;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+button.secondary {
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--room-border);
+  background: var(--room-bg-subtle);
+}
+
+.eyebrow {
+  color: var(--room-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 16px;
+}
+
+h2 {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.header-actions,
+.composer-actions,
+.profile-actions,
+.context-row,
+.status-strip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status-strip {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--room-border);
+  background: color-mix(in srgb, var(--room-bg-subtle) 72%, var(--room-bg-panel));
+}
+
+.provider-health {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.health-chip {
+  border: 1px solid var(--room-border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  color: var(--room-muted);
+  background: var(--room-bg-panel);
+}
+
+.health-chip.ready {
+  color: var(--room-good);
+}
+
+.health-chip.missing,
+.health-chip.error {
+  color: var(--room-bad);
+}
+
+.health-chip.needsConfig,
+.health-chip.needsAuth {
+  color: var(--room-warn);
+}
+
+.workflow-picker,
+.safety-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--room-muted);
+}
+
+.advisor {
+  border-bottom: 1px solid var(--room-border);
+  padding: 10px 16px;
+  background: var(--vscode-editorWidget-background);
+}
+
+.advisor-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.advisor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.setup-panel {
+  border-bottom: 1px solid var(--room-border);
+  padding: 12px 16px;
+  background: var(--room-bg-subtle);
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(260px, 1.25fr);
+  gap: 14px;
+}
+
+.team-card {
+  border: 1px solid var(--room-border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--room-bg-panel);
+}
+
+.team-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.team-provider,
+.team-description,
+.message-meta,
+.role-description {
+  color: var(--room-muted);
+  font-size: 12px;
+}
+
+.role-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.role-badge {
+  border: 1px solid var(--room-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}
+
+.role-matrix {
+  overflow: auto;
+  border: 1px solid var(--room-border);
+  border-radius: 6px;
+  max-height: 340px;
+}
+
+.role-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) repeat(7, minmax(58px, 72px));
+  gap: 1px;
+  border-bottom: 1px solid var(--room-border);
+  background: var(--room-border);
+}
+
+.role-row > div,
+.role-row > label {
+  background: var(--room-bg-panel);
+  padding: 6px;
+  min-height: 32px;
+}
+
+.role-row.header > div {
+  font-weight: 600;
+  background: var(--room-bg-subtle);
+}
+
+.role-cell {
+  text-align: center;
+}
+
+.transcript {
+  overflow: auto;
+  padding: 16px;
+}
+
+.empty {
+  color: var(--room-muted);
+  border: 1px dashed var(--room-border);
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+}
+
+.message {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--room-border) 65%, transparent);
+}
+
+.message-name {
+  font-weight: 600;
+}
+
+.message-content {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.message.error .message-name,
+.message.error .message-content {
+  color: var(--room-bad);
+}
+
+details {
+  margin-top: 8px;
+  color: var(--room-muted);
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background);
+}
+
+.composer {
+  border-top: 1px solid var(--room-border);
+  padding: 10px 16px;
+  background: var(--room-bg-subtle);
+}
+
+.context-row {
+  color: var(--room-muted);
+  margin-bottom: 8px;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 84px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--room-border));
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.composer-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.hidden {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .room-header,
+  .message {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .role-row {
+    grid-template-columns: minmax(120px, 1fr) repeat(7, 52px);
+  }
+}

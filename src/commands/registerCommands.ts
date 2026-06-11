@@ -1,30 +1,9 @@
 import * as vscode from "vscode";
 import { AgentRoomController } from "../core/AgentRoomController";
-
-export const COMMAND_IDS = [
-  "agentRoom.open",
-  "agentRoom.checkCliHealth",
-  "agentRoom.openRoomSetup",
-  "agentRoom.resetRoleAssignments",
-  "agentRoom.exportRoomProfile",
-  "agentRoom.importRoomProfile",
-  "agentRoom.sendCurrentSelectionToAtlas",
-  "agentRoom.sendCurrentSelectionToForge",
-  "agentRoom.sendCurrentSelectionToSentinel",
-  "agentRoom.sendCurrentSelectionToGauge",
-  "agentRoom.sendCurrentSelectionToScout",
-  "agentRoom.sendSelectionToAssignedPlanner",
-  "agentRoom.sendSelectionToAssignedCoder",
-  "agentRoom.sendSelectionToAssignedReviewer",
-  "agentRoom.runPlanningWorkflowOnCurrentFile",
-  "agentRoom.runFullBuildCycleOnCurrentFile",
-  "agentRoom.exportTranscript",
-  "agentRoom.clearTranscript",
-  "agentRoom.openSettings"
-] as const;
+import { AgentRoomCommandId } from "./commandIds";
 
 export function registerCommands(context: vscode.ExtensionContext, controller: AgentRoomController): void {
-  const registrations: Array<[string, () => unknown]> = [
+  const registrations: Array<[AgentRoomCommandId, () => unknown]> = [
     ["agentRoom.open", () => controller.open()],
     ["agentRoom.checkCliHealth", () => controller.checkCliHealth()],
     ["agentRoom.openRoomSetup", () => controller.openRoomSetup()],

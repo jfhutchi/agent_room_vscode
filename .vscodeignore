@@ -1,0 +1,14 @@
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+out/test/**
+docs/**
+prompts/**
+node_modules/**
+.gitignore
+.agent-room/**
+tsconfig.json
+eslint.config.js
+**/*.map
+**/*.ts

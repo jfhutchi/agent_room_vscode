@@ -5,7 +5,7 @@
     transcript: null,
     settings: null,
     operatingMode: "personalLocal",
-    operatingModeTitle: "Agent Room - Personal Mode",
+    operatingModeTitle: "Agent Room — Personal Mode",
     operatingModeDescription: "Using local Claude Code and Codex CLI providers.",
     health: {},
     selectedWorkflowId: "manual",
@@ -256,7 +256,7 @@
         transcript: message.transcript,
         settings: message.settings,
         operatingMode: message.operatingMode || "personalLocal",
-        operatingModeTitle: message.operatingModeTitle || "Agent Room - Personal Mode",
+        operatingModeTitle: message.operatingModeTitle || "Agent Room — Personal Mode",
         operatingModeDescription:
           message.operatingModeDescription || "Using local Claude Code and Codex CLI providers.",
         health: message.health || {},

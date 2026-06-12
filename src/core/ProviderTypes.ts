@@ -12,6 +12,7 @@ import {
   SafetyMode,
   VirtualAgentId
 } from "./Types";
+import type { OperatingMode } from "./OperatingMode";
 
 /** Capabilities detected from non-invasive `--help` probing. */
 export interface ProviderCapabilities {
@@ -90,6 +91,8 @@ export interface Provider {
   displayName: string;
   kind: ProviderKind;
   enabled: boolean;
+  /** Operating modes this provider may exist in (SPEC §3.4, §4). */
+  supportedModes: readonly OperatingMode[];
   healthCheck(): Promise<ProviderHealth>;
   runTurn(invocation: ProviderInvocation): Promise<ProviderResult>;
 }

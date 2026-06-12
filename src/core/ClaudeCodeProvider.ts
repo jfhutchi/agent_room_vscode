@@ -76,6 +76,7 @@ export class ClaudeCodeProvider implements Provider {
   readonly displayName = "Claude Code";
   readonly kind = "localCli";
   readonly enabled = true;
+  readonly supportedModes = ["personalLocal"] as const;
 
   constructor(private readonly options: ClaudeCodeProviderOptions) {}
 

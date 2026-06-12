@@ -74,3 +74,28 @@ when it happens.)
 **Why:** SPEC §0.1/§0.2 — the repo's architecture works and is tested; we keep the
 controller/runner split and expand Conductor only where future workflows genuinely
 need it, instead of rewriting working code to match the spec's naming.
+
+## 6. Invalid configured operating mode forces explicit selection (Phase 2)
+
+**What:** SPEC §3.1 gives `agentRoom.operatingMode` a default of `personalLocal`. If
+the setting holds a value outside the two-value enum (only possible by hand-editing
+settings JSON, e.g. `"hybrid"`), Agent Room does not silently coerce it to the
+default; it surfaces an error and requires the user to pick Work or Personal Mode
+before the room opens.
+
+**Why:** Silently mapping an unknown value to `personalLocal` could route a company
+repository to personal providers because of a typo. Failing closed preserves §3.4's
+partition intent; "hybrid" must never resolve to a real mode.
+
+## 7. `workMode.enabled` / `personalMode.enabled` semantics (Phase 2)
+
+**What:** SPEC §15 lists `agentRoom.workMode.enabled` and
+`agentRoom.personalMode.enabled` but no section defines their behavior. Phase 2
+implements them as: a disabled mode is hidden from the first-launch picker and the
+Switch Operating Mode picker, and explicit switches to it are refused with a message.
+If both are disabled, both pickers fall back to offering both modes rather than
+locking the user out of the extension.
+
+**Why:** The keys must exist per §15 and dead settings would be dishonest; this is
+the minimal reasonable reading. The both-disabled fallback avoids a configuration
+that bricks the room.

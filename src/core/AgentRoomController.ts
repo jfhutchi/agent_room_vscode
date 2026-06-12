@@ -39,8 +39,10 @@ import {
   WORK_TO_PERSONAL_WARNING,
   modeChangedMessage,
   modeDescription,
+  modeName,
   modeTitle,
   resolveControllerStartupMode,
+  type ModePickerItem,
   type OperatingMode
 } from "./OperatingMode";
 
@@ -103,6 +105,48 @@ export class AgentRoomController {
     return controller;
   }
 
+  /**
+   * Builds every mode-scoped resource (profile store, profile, provider
+   * registry) for the given mode. Nothing mode-scoped exists before the
+   * workspace's mode is known (SPEC §3.4).
+   */
+  private async initializeModeResources(mode: OperatingMode): Promise<void> {
+    this.operatingMode = mode;
+    this.settings.operatingMode = mode;
+    this.profileStore = this.createProfileStore(mode);
+    this.profile = await this.profileStore.load();
+    this.applySettingsToProfile();
+    this.providerRegistry = this.createProviderRegistry(mode);
+  }
+
+  private requireOperatingMode(): OperatingMode {
+    if (!this.operatingMode) {
+      throw new Error("Agent Room operating mode has not been selected for this workspace yet.");
+    }
+    return this.operatingMode;
+  }
+
+  private requireProfile(): RoomProfile {
+    if (!this.profile) {
+      throw new Error("Agent Room profile is not loaded. Choose an operating mode first.");
+    }
+    return this.profile;
+  }
+
+  private requireProfileStore(): RoomProfileStore {
+    if (!this.profileStore) {
+      throw new Error("Agent Room profile store is not ready. Choose an operating mode first.");
+    }
+    return this.profileStore;
+  }
+
+  private requireProviderRegistry(): ProviderRegistry {
+    if (!this.providerRegistry) {
+      throw new Error("Agent Room providers are not ready. Choose an operating mode first.");
+    }
+    return this.providerRegistry;
+  }
+
   dispose(): void {
     this.abortController?.abort();
     this.panel?.dispose();
@@ -140,6 +184,12 @@ export class AgentRoomController {
   async switchOperatingMode(targetMode?: OperatingMode): Promise<void> {
     const selected = targetMode ?? (await this.pickSwitchMode());
     if (!selected) return;
+    if (!this.allowedModes().includes(selected)) {
+      await vscode.window.showWarningMessage(
+        `${modeName(selected)} is disabled by your Agent Room settings.`
+      );
+      return;
+    }
 
     let typedConfirmation: string | undefined;
     if (
@@ -223,7 +273,7 @@ export class AgentRoomController {
 
   async sendCurrentSelectionToRole(roleId: string): Promise<void> {
     if (!(await this.open())) return;
-    const team = new VirtualTeamRegistry(this.profile.virtualAgents);
+    const team = new VirtualTeamRegistry(this.requireProfile().virtualAgents);
     const agent = team.agentsWithAnyRole([roleId])[0];
     if (!agent) {
       await this.addConductorMessage(`No enabled team member currently has role: ${roleId}.`, "error");
@@ -303,7 +353,7 @@ export class AgentRoomController {
         await this.updateRoleAssignment(message.agentId, message.roleId, message.assigned);
         return;
       case "saveRoomProfile":
-        await this.profileStore.save(this.profile);
+        await this.requireProfileStore().save(this.requireProfile());
         return;
       case "restoreDefaultProfile":
         await this.resetRoleAssignments();
@@ -347,7 +397,7 @@ export class AgentRoomController {
   private async sendToAgent(agentId: string, text: string, replyToMessageId?: string): Promise<void> {
     await this.ensureTranscript();
     await this.appendUserMessage(text, replyToMessageId);
-    const team = new VirtualTeamRegistry(this.profile.virtualAgents);
+    const team = new VirtualTeamRegistry(this.requireProfile().virtualAgents);
     const agent = team.get(agentId);
     if (!agent) {
       await this.addConductorMessage(`Team member not found: ${agentId}.`, "error");
@@ -416,9 +466,19 @@ export class AgentRoomController {
     }
   ): Promise<void> {
     const transcript = await this.ensureTranscript();
-    const provider = this.profile.providers.find((entry) => entry.id === agent.providerId);
+    const provider = this.requireProfile().providers.find((entry) => entry.id === agent.providerId);
     if (!provider || provider.kind === "human" || provider.kind === "internal") {
       await this.addConductorMessage(`${agent.displayName} is not backed by a runnable provider.`, "error");
+      return;
+    }
+    const providerRegistry = this.requireProviderRegistry();
+    if (!providerRegistry.has(agent.providerId)) {
+      // SPEC §3.4: never substitute providers across the Work/Personal
+      // partition; explain instead of falling back.
+      await this.addConductorMessage(
+        `${agent.displayName} needs the ${provider.displayName} provider, which is not available in ${modeName(this.requireOperatingMode())}. Agent Room never substitutes providers across the Work/Personal partition.`,
+        "error"
+      );
       return;
     }
     const roles = this.rolesForAgent(agent);
@@ -451,7 +511,7 @@ export class AgentRoomController {
 
     try {
       const result = await runAgentTurn({
-        providerRegistry: this.providerRegistry,
+        providerRegistry,
         agent,
         provider,
         roles,
@@ -515,11 +575,11 @@ export class AgentRoomController {
     if (current) return current;
     const context = await this.collectContext();
     return this.transcriptStore.create({
-      operatingMode: this.operatingMode,
+      operatingMode: this.requireOperatingMode(),
       workspacePath: context.workspacePath,
       workspaceName: context.workspaceName,
       gitBranch: context.gitBranch,
-      roomProfileSnapshot: this.profile,
+      roomProfileSnapshot: this.requireProfile(),
       workflowId: this.selectedWorkflowId,
       settingsSnapshot: this.settings as unknown as Record<string, unknown>
     });
@@ -564,7 +624,10 @@ export class AgentRoomController {
   }
 
   private async hydrate(): Promise<void> {
-    await this.panel?.post({
+    // The panel only exists after a mode was selected, but guard anyway: a
+    // hydrate before mode selection has nothing meaningful to render.
+    if (!this.panel || !this.operatingMode || !this.profile) return;
+    await this.panel.post({
       type: "hydrate",
       profile: this.profile,
       transcript: this.transcriptStore.current(),
@@ -593,9 +656,27 @@ export class AgentRoomController {
     return true;
   }
 
+  /**
+   * Modes selectable under agentRoom.workMode.enabled /
+   * agentRoom.personalMode.enabled. Disabling both would lock the user out,
+   * so that combination falls back to offering both modes.
+   */
+  private allowedModes(): OperatingMode[] {
+    const allowed: OperatingMode[] = [];
+    if (this.settings.workModeEnabled) allowed.push("workCopilotNative");
+    if (this.settings.personalModeEnabled) allowed.push("personalLocal");
+    return allowed.length > 0 ? allowed : ["workCopilotNative", "personalLocal"];
+  }
+
+  private filterPickerItems(items: readonly ModePickerItem[]): ModePickerItem[] {
+    const allowed = this.allowedModes();
+    return items.filter((item) => !item.mode || allowed.includes(item.mode));
+  }
+
   private async pickFirstLaunchMode(): Promise<OperatingMode | undefined> {
+    const items = this.filterPickerItems(FIRST_LAUNCH_MODE_PICKER_ITEMS);
     while (true) {
-      const picked = await vscode.window.showQuickPick(FIRST_LAUNCH_MODE_PICKER_ITEMS, {
+      const picked = await vscode.window.showQuickPick(items, {
         title: "Choose Agent Room mode for this workspace",
         placeHolder:
           "Work Mode and Personal Mode are fully separated. Mode can be changed later only through Agent Room: Switch Operating Mode.",
@@ -613,7 +694,7 @@ export class AgentRoomController {
   }
 
   private async pickSwitchMode(): Promise<OperatingMode | undefined> {
-    const picked = await vscode.window.showQuickPick(SWITCH_MODE_PICKER_ITEMS, {
+    const picked = await vscode.window.showQuickPick(this.filterPickerItems(SWITCH_MODE_PICKER_ITEMS), {
       title: "Agent Room: Switch Operating Mode",
       placeHolder: "Choose Work / Copilot Native or Personal / Local CLI.",
       ignoreFocusOut: true
@@ -622,11 +703,7 @@ export class AgentRoomController {
   }
 
   private async setOperatingMode(mode: OperatingMode): Promise<void> {
-    this.operatingMode = mode;
-    this.settings.operatingMode = mode;
-    this.profileStore = this.createProfileStore();
-    this.profile = await this.profileStore.load();
-    this.applySettingsToProfile();
+    await this.initializeModeResources(mode);
   }
 
   private async startModeTranscriptSegment(mode: OperatingMode): Promise<void> {
@@ -636,7 +713,7 @@ export class AgentRoomController {
       workspacePath: context.workspacePath,
       workspaceName: context.workspaceName,
       gitBranch: context.gitBranch,
-      roomProfileSnapshot: this.profile,
+      roomProfileSnapshot: this.requireProfile(),
       workflowId: this.selectedWorkflowId,
       settingsSnapshot: this.settings as unknown as Record<string, unknown>
     });
@@ -653,10 +730,10 @@ export class AgentRoomController {
     await this.panel?.post({ type: "runningStateChanged", running: false });
   }
 
-  private createProfileStore(): RoomProfileStore {
+  private createProfileStore(operatingMode: OperatingMode): RoomProfileStore {
     return new RoomProfileStore({
       mode: this.settings.roomProfileStorage,
-      operatingMode: this.operatingMode,
+      operatingMode,
       workspaceRoot: this.workspaceRoot(),
       globalStore: this.context.globalState
     });
@@ -670,7 +747,14 @@ export class AgentRoomController {
     });
   }
 
-  private createProviderRegistry(): ProviderRegistry {
+  private createProviderRegistry(operatingMode: OperatingMode): ProviderRegistry {
+    if (operatingMode === "workCopilotNative") {
+      // SPEC §3.4: in Work Mode the personal providers (claudeCodeCli,
+      // codexCli, openAiWebSearch) are never constructed or registered.
+      // Runnable Copilot providers arrive in a later phase, so the Work Mode
+      // registry is honestly empty rather than faking Copilot execution.
+      return new ProviderRegistry([], operatingMode);
+    }
     return new ProviderRegistry([
       new ClaudeCodeProvider({
         executable: this.settings.claudeExecutable,
@@ -690,34 +774,37 @@ export class AgentRoomController {
         settings: this.settings.webResearch,
         secretReader: this.context.secrets
       })
-    ]);
+    ], operatingMode);
   }
 
   private createWorkflowRunner(): WorkflowRunner {
+    const profile = this.requireProfile();
     return new WorkflowRunner({
-      team: new VirtualTeamRegistry(this.profile.virtualAgents),
-      roles: new RoleRegistry(this.profile.roles),
-      workflows: new WorkflowRegistry(this.profile.workflows),
-      providers: this.profile.providers
+      team: new VirtualTeamRegistry(profile.virtualAgents),
+      roles: new RoleRegistry(profile.roles),
+      workflows: new WorkflowRegistry(profile.workflows),
+      providers: profile.providers
     });
   }
 
   private createAdvisor(): ModelAdvisor {
+    const profile = this.requireProfile();
     return new ModelAdvisor({
-      team: new VirtualTeamRegistry(this.profile.virtualAgents),
-      roles: new RoleRegistry(this.profile.roles),
-      workflows: new WorkflowRegistry(this.profile.workflows),
+      team: new VirtualTeamRegistry(profile.virtualAgents),
+      roles: new RoleRegistry(profile.roles),
+      workflows: new WorkflowRegistry(profile.workflows),
       settings: this.settings.modelAdvisor
     });
   }
 
   private rolesForAgent(agent: VirtualAgent): RoleDefinition[] {
-    return new RoleRegistry(this.profile.roles).getMany(agent.assignedRoleIds);
+    return new RoleRegistry(this.requireProfile().roles).getMany(agent.assignedRoleIds);
   }
 
   private participants() {
-    return this.profile.virtualAgents.map((agent) => {
-      const provider = this.profile.providers.find((entry) => entry.id === agent.providerId);
+    const profile = this.requireProfile();
+    return profile.virtualAgents.map((agent) => {
+      const provider = profile.providers.find((entry) => entry.id === agent.providerId);
       return {
         displayName: agent.displayName,
         providerName: provider?.displayName ?? agent.providerId,
@@ -748,13 +835,17 @@ export class AgentRoomController {
   }
 
   private applySettingsToProfile(): void {
-    for (const provider of this.profile.providers) {
+    const profile = this.requireProfile();
+    for (const provider of profile.providers) {
       if (provider.id === "claudeCodeCli") provider.executable = this.settings.claudeExecutable;
       if (provider.id === "codexCli") provider.executable = this.settings.codexExecutable;
       if (provider.id === "openAiWebSearch") provider.enabled = this.settings.webResearch.enabled;
     }
-    const scout = this.profile.virtualAgents.find((agent) => agent.id === "scout");
-    if (scout) scout.enabled = this.settings.webResearch.enabled;
+    // Scout is provider-backed by openAiWebSearch only in Personal Mode.
+    const scout = profile.virtualAgents.find((agent) => agent.id === "scout");
+    if (scout && scout.providerId === "openAiWebSearch") {
+      scout.enabled = this.settings.webResearch.enabled;
+    }
   }
 
   private updateUiState(state: {
@@ -773,19 +864,21 @@ export class AgentRoomController {
   }
 
   private async updateRoleAssignment(agentId: string, roleId: string, assigned: boolean): Promise<void> {
-    const agent = this.profile.virtualAgents.find((entry) => entry.id === agentId);
+    const profile = this.requireProfile();
+    const agent = profile.virtualAgents.find((entry) => entry.id === agentId);
     if (!agent) throw new Error(`Team member not found: ${agentId}`);
     if (assigned && !agent.assignedRoleIds.includes(roleId)) agent.assignedRoleIds.push(roleId);
     if (!assigned) agent.assignedRoleIds = agent.assignedRoleIds.filter((id) => id !== roleId);
-    await this.profileStore.save(this.profile);
+    await this.requireProfileStore().save(profile);
     await this.hydrate();
   }
 
   private async createCustomRole(name: string, description: string, instructions: string): Promise<void> {
-    const registry = new RoleRegistry(this.profile.roles);
+    const profile = this.requireProfile();
+    const registry = new RoleRegistry(profile.roles);
     const role = registry.createCustomRole({ name, description, instructions });
-    this.profile.roles = registry.all();
-    await this.profileStore.save(this.profile);
+    profile.roles = registry.all();
+    await this.requireProfileStore().save(profile);
     await this.panel?.post({ type: "profileUpdated", role });
     await this.hydrate();
   }
@@ -794,21 +887,23 @@ export class AgentRoomController {
     roleId: string,
     patch: { name?: string; description?: string; instructions?: string }
   ): Promise<void> {
-    const registry = new RoleRegistry(this.profile.roles);
+    const profile = this.requireProfile();
+    const registry = new RoleRegistry(profile.roles);
     registry.updateCustomRole(roleId, patch);
-    this.profile.roles = registry.all();
-    await this.profileStore.save(this.profile);
+    profile.roles = registry.all();
+    await this.requireProfileStore().save(profile);
     await this.hydrate();
   }
 
   private async deleteCustomRole(roleId: string): Promise<void> {
-    const registry = new RoleRegistry(this.profile.roles);
+    const profile = this.requireProfile();
+    const registry = new RoleRegistry(profile.roles);
     registry.deleteRole(roleId);
-    this.profile.roles = registry.all();
-    for (const agent of this.profile.virtualAgents) {
+    profile.roles = registry.all();
+    for (const agent of profile.virtualAgents) {
       agent.assignedRoleIds = agent.assignedRoleIds.filter((id) => id !== roleId);
     }
-    await this.profileStore.save(this.profile);
+    await this.requireProfileStore().save(profile);
     await this.hydrate();
   }
 

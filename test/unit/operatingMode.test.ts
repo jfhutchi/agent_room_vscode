@@ -9,6 +9,8 @@ import {
   WORK_TO_PERSONAL_WARNING,
   configuredOperatingModeErrorMessage,
   isOperatingMode,
+  modeDescription,
+  modeTitle,
   parseOperatingMode,
   profileFileNameForMode,
   resolveControllerStartupMode,
@@ -204,6 +206,19 @@ test("switching mode cancels running state and starts a new mode-tagged segment"
     "segment:workCopilotNative",
     "message:workCopilotNative"
   ]);
+});
+
+test("header badge uses the canonical mode strings from SPEC §3.1", () => {
+  assert.equal(modeTitle("workCopilotNative"), "Agent Room — Work Mode");
+  assert.equal(modeTitle("personalLocal"), "Agent Room — Personal Mode");
+  assert.equal(
+    modeDescription("workCopilotNative"),
+    "Using company-approved GitHub Copilot providers."
+  );
+  assert.equal(
+    modeDescription("personalLocal"),
+    "Using local Claude Code and Codex CLI providers."
+  );
 });
 
 test("profile file names are per-mode only", () => {

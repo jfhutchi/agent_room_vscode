@@ -38,6 +38,7 @@ export class OpenAiWebSearchProvider implements Provider {
   readonly displayName = "OpenAI Web Search";
   readonly kind = "apiResearch";
   readonly enabled: boolean;
+  readonly supportedModes = ["personalLocal"] as const;
 
   constructor(private readonly options: OpenAiWebSearchProviderOptions) {
     this.enabled = options.enabled;

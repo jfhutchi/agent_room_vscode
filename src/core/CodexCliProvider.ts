@@ -78,6 +78,7 @@ export class CodexCliProvider implements Provider {
   readonly displayName = "Codex CLI";
   readonly kind = "localCli";
   readonly enabled = true;
+  readonly supportedModes = ["personalLocal"] as const;
 
   constructor(private readonly options: CodexCliProviderOptions) {}
 

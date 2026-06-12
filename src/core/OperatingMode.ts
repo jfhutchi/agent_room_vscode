@@ -156,7 +156,7 @@ export function resolveControllerStartupMode(
 }
 
 export function modeTitle(mode: OperatingMode): string {
-  return mode === "workCopilotNative" ? "Agent Room - Work Mode" : "Agent Room - Personal Mode";
+  return mode === "workCopilotNative" ? "Agent Room — Work Mode" : "Agent Room — Personal Mode";
 }
 
 export function modeDescription(mode: OperatingMode): string {

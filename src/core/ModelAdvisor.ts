@@ -12,12 +12,14 @@ import { VirtualTeamRegistry } from "./VirtualTeamRegistry";
 import { WorkflowRegistry, WORKFLOW_IDS } from "./WorkflowRegistry";
 import { WorkflowRunner } from "./WorkflowRunner";
 import { defaultProviders } from "./VirtualTeamRegistry";
+import { DEFAULT_OPERATING_MODE, type OperatingMode } from "./OperatingMode";
 
 export interface ModelAdvisorOptions {
   team: VirtualTeamRegistry;
   roles: RoleRegistry;
   workflows: WorkflowRegistry;
   settings: ModelAdvisorSettings;
+  operatingMode?: OperatingMode;
 }
 
 export class ModelAdvisor {
@@ -38,7 +40,8 @@ export class ModelAdvisor {
             team: this.options.team,
             roles: this.options.roles,
             workflows: this.options.workflows,
-            providers: defaultProviders()
+            providers: defaultProviders(this.operatingMode()),
+            operatingMode: this.operatingMode()
           })
             .planWorkflow(workflowId)
             .steps.filter((step) => step.agent)
@@ -147,5 +150,9 @@ export class ModelAdvisor {
 
   private reasoningFor(category: TaskCategory, workflowName: string): string {
     return `Classified as ${category}; recommended ${workflowName} with assigned role holders.`;
+  }
+
+  private operatingMode(): OperatingMode {
+    return this.options.operatingMode ?? DEFAULT_OPERATING_MODE;
   }
 }

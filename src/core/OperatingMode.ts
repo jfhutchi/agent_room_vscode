@@ -13,6 +13,26 @@ export const WORK_TO_PERSONAL_CONFIRMATION_TEXT = "I understand";
 export const ROOM_OPEN_MODE_REQUIRED_MESSAGE =
   "Choose Work Mode or Personal Mode before using Agent Room.";
 
+/** Canonical limitation string for direct Copilot session orchestration (SPEC §3.2). */
+export const COPILOT_AGENT_SESSION_LIMITATION =
+  "Direct Copilot Agent Session orchestration is not exposed through public APIs in this " +
+  "environment. Agent Room can still generate Copilot custom agents and use approved Work " +
+  "Mode features.";
+
+/**
+ * The §6 separation guard: shown whenever something asks for a provider on
+ * the other side of the Work/Personal partition, instead of substituting.
+ */
+export function separationGuardMessage(mode: OperatingMode): string {
+  return mode === "workCopilotNative"
+    ? "This workspace is in Work Mode. Local Claude Code and Codex providers are " +
+        "unavailable here by design. If this is a personal repository, use " +
+        "Agent Room: Switch Operating Mode."
+    : "This workspace is in Personal Mode. GitHub Copilot providers are unavailable " +
+        "here by design. If this is a company repository, use " +
+        "Agent Room: Switch Operating Mode.";
+}
+
 export const MODE_STATE_KEY = "agentRoom.operatingMode";
 export const MODE_FIRST_LAUNCH_COMPLETE_KEY = "agentRoom.operatingMode.firstLaunchComplete";
 export const MODE_EVER_WORK_KEY = "agentRoom.operatingMode.everWorkMode";

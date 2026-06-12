@@ -7,7 +7,13 @@
  * permitted for a given safety mode.
  */
 
-import { SafetyMode } from "./Types";
+import { ProviderId, SafetyMode } from "./Types";
+import {
+  isProviderValidForMode,
+  modeName,
+  separationGuardMessage,
+  type OperatingMode
+} from "./OperatingMode";
 
 /** Flags that are never passed to a CLI unless dangerous mode is fully armed. */
 export const DANGEROUS_FLAG_PATTERNS: RegExp[] = [
@@ -18,6 +24,22 @@ export const DANGEROUS_FLAG_PATTERNS: RegExp[] = [
   /bypass.?approvals/i,
   /bypass.?sandbox/i
 ];
+
+/**
+ * Integration techniques Agent Room never uses, in any mode, under any
+ * setting (SPEC §17). There is intentionally no flag, mode, or confirmation
+ * that unblocks these.
+ */
+export const FORBIDDEN_INTEGRATION_TECHNIQUES = [
+  "copilotChatScraping",
+  "copilotUiAutomation",
+  "privateVsCodeApi",
+  "terminalScreenScraping",
+  "orgPolicyBypass",
+  "chatGptUiAutomation"
+] as const;
+
+export type ForbiddenIntegrationTechnique = (typeof FORBIDDEN_INTEGRATION_TECHNIQUES)[number];
 
 export interface SafetyDecision {
   allowed: boolean;
@@ -46,6 +68,38 @@ export class SafetyPolicy {
       return "dangerous";
     }
     return "workspaceWriteWithApproval";
+  }
+
+  /**
+   * Cross-partition fallback block (SPEC §3.4, §17). A provider on the other
+   * side of the Work/Personal partition is never a permitted fallback; no
+   * safety context, setting, or confirmation can open this gate.
+   */
+  checkProviderForMode(providerId: ProviderId, operatingMode: OperatingMode): SafetyDecision {
+    if (isProviderValidForMode(providerId, operatingMode)) {
+      return { allowed: true };
+    }
+    return {
+      allowed: false,
+      reason:
+        `Provider ${providerId} is blocked in ${modeName(operatingMode)}. ` +
+        separationGuardMessage(operatingMode)
+    };
+  }
+
+  /**
+   * Forbidden integration techniques (SPEC §17) are blocked unconditionally:
+   * no Copilot Chat scraping, no Copilot/ChatGPT UI automation, no private
+   * VS Code APIs, no terminal screen-scraping, no org-policy bypass.
+   */
+  checkIntegrationTechnique(technique: string): SafetyDecision {
+    if ((FORBIDDEN_INTEGRATION_TECHNIQUES as readonly string[]).includes(technique)) {
+      return {
+        allowed: false,
+        reason: `Integration technique "${technique}" is forbidden in every mode and cannot be enabled.`
+      };
+    }
+    return { allowed: true };
   }
 
   /** Validate a CLI argument list against the dangerous-flag blocklist. */

@@ -37,11 +37,13 @@ import {
   SWITCH_MODE_PICKER_ITEMS,
   WORK_TO_PERSONAL_CONFIRMATION_TEXT,
   WORK_TO_PERSONAL_WARNING,
+  isProviderValidForMode,
   modeChangedMessage,
   modeDescription,
   modeName,
   modeTitle,
   resolveControllerStartupMode,
+  separationGuardMessage,
   type ModePickerItem,
   type OperatingMode
 } from "./OperatingMode";
@@ -475,8 +477,12 @@ export class AgentRoomController {
     if (!providerRegistry.has(agent.providerId)) {
       // SPEC §3.4: never substitute providers across the Work/Personal
       // partition; explain instead of falling back.
+      const mode = this.requireOperatingMode();
+      const explanation = isProviderValidForMode(agent.providerId, mode)
+        ? "Agent Room never substitutes providers across the Work/Personal partition."
+        : separationGuardMessage(mode);
       await this.addConductorMessage(
-        `${agent.displayName} needs the ${provider.displayName} provider, which is not available in ${modeName(this.requireOperatingMode())}. Agent Room never substitutes providers across the Work/Personal partition.`,
+        `${agent.displayName} needs the ${provider.displayName} provider, which is not available in ${modeName(mode)}. ${explanation}`,
         "error"
       );
       return;
@@ -783,7 +789,8 @@ export class AgentRoomController {
       team: new VirtualTeamRegistry(profile.virtualAgents),
       roles: new RoleRegistry(profile.roles),
       workflows: new WorkflowRegistry(profile.workflows),
-      providers: profile.providers
+      providers: profile.providers,
+      operatingMode: this.requireOperatingMode()
     });
   }
 
@@ -793,7 +800,8 @@ export class AgentRoomController {
       team: new VirtualTeamRegistry(profile.virtualAgents),
       roles: new RoleRegistry(profile.roles),
       workflows: new WorkflowRegistry(profile.workflows),
-      settings: this.settings.modelAdvisor
+      settings: this.settings.modelAdvisor,
+      operatingMode: this.requireOperatingMode()
     });
   }
 

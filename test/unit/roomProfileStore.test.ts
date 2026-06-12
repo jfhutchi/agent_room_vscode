@@ -73,6 +73,16 @@ test("loading a Work profile that references personal providers is a validation 
   }
 });
 
+test("importing a profile naming a cross-mode provider fails validation, never remaps", () => {
+  const workStore = new RoomProfileStore({ mode: "global", operatingMode: "workCopilotNative" });
+  const personalProfileJson = JSON.stringify(createDefaultRoomProfile("personalLocal"));
+  assert.throws(() => workStore.parseImported(personalProfileJson), /not valid in Work Mode/);
+
+  const personalStore = new RoomProfileStore({ mode: "global", operatingMode: "personalLocal" });
+  const workProfileJson = JSON.stringify(createDefaultRoomProfile("workCopilotNative"));
+  assert.throws(() => personalStore.parseImported(workProfileJson), /not valid in Personal Mode/);
+});
+
 test("loading a Personal profile that references Copilot providers is a validation error", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "agent-room-profile-"));
   try {

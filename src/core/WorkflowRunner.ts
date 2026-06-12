@@ -9,12 +9,25 @@ import { RoleRegistry } from "./RoleRegistry";
 import { VirtualTeamRegistry } from "./VirtualTeamRegistry";
 import { WorkflowRegistry } from "./WorkflowRegistry";
 import { SafetyPolicy } from "./SafetyPolicy";
+import {
+  COPILOT_AGENT_SESSION_LIMITATION,
+  isProviderValidForMode,
+  modeName,
+  separationGuardMessage,
+  type OperatingMode
+} from "./OperatingMode";
 
 export interface WorkflowRunnerOptions {
   team: VirtualTeamRegistry;
   roles: RoleRegistry;
   workflows: WorkflowRegistry;
   providers: ProviderProfile[];
+  operatingMode: OperatingMode;
+  /**
+   * Direct Copilot Agent Session orchestration is capability-gated (SPEC §7
+   * Level 3). Stays false until public APIs verifiably support it.
+   */
+  copilotAgentSessionSupported?: boolean;
 }
 
 export interface PlannedWorkflowStep {
@@ -54,13 +67,52 @@ export class WorkflowRunner {
     const plan = this.planWorkflow(workflowId);
     const errors: string[] = [];
     const warnings: string[] = [];
+    const mode = this.options.operatingMode;
 
     for (const planned of plan.steps) {
-      if (planned.step.speaker === "conductor" || planned.step.optional) continue;
-      if (!planned.agent) {
+      if (planned.step.speaker === "conductor") continue;
+
+      // Mode validation (SPEC §3.4, §10): a step that demands a provider from
+      // the other side of the Work/Personal partition gets the separation
+      // guard, never a silent substitution.
+      const preferredProviderId = planned.step.preferredProviderId;
+      if (preferredProviderId && !isProviderValidForMode(preferredProviderId, mode)) {
         errors.push(
-          `Workflow step "${planned.step.name}" requires ${planned.roleNames.join(" or ") || "an assigned role"}.`
+          `Workflow step "${planned.step.name}" requires the ${preferredProviderId} provider, ` +
+            `which does not exist in ${modeName(mode)}. ${separationGuardMessage(mode)}`
         );
+        continue;
+      }
+      if (planned.agent && !isProviderValidForMode(planned.agent.providerId, mode)) {
+        errors.push(
+          `${planned.agent.displayName} is backed by the ${planned.agent.providerId} provider, ` +
+            `which does not exist in ${modeName(mode)}. ${separationGuardMessage(mode)}`
+        );
+        continue;
+      }
+
+      // Direct Copilot session orchestration stays blocked until public APIs
+      // verifiably support it (SPEC §7 Level 3, §10).
+      const wantsAgentSession =
+        preferredProviderId === "copilotAgentSession" ||
+        planned.agent?.providerId === "copilotAgentSession";
+      if (wantsAgentSession && !this.options.copilotAgentSessionSupported) {
+        errors.push(
+          `Workflow step "${planned.step.name}" requires direct Copilot Agent Session ` +
+            `orchestration. ${COPILOT_AGENT_SESSION_LIMITATION}`
+        );
+        continue;
+      }
+
+      if (!planned.agent) {
+        const requirement = planned.roleNames.join(" or ") || "an assigned role";
+        if (planned.step.optional) {
+          warnings.push(
+            `Optional step "${planned.step.name}" will be skipped: no enabled team member holds ${requirement}.`
+          );
+        } else {
+          errors.push(`Workflow step "${planned.step.name}" requires ${requirement}.`);
+        }
       }
     }
 

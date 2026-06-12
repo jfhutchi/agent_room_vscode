@@ -32,6 +32,7 @@ import { collectWorkspaceContext } from "./WorkspaceContext";
 import { runAgentTurn } from "./AgentRunner";
 import { checkProviderHealth } from "./HealthCheck";
 import {
+  DEFAULT_OPERATING_MODE,
   FIRST_LAUNCH_MODE_PICKER_ITEMS,
   OperatingModeManager,
   SWITCH_MODE_PICKER_ITEMS,
@@ -72,10 +73,12 @@ export class AgentRoomController {
     this.operatingModeManager = new OperatingModeManager({
       workspaceState: this.context.workspaceState,
       configuredMode: this.settings.operatingMode,
+      invalidConfiguredMode: this.settings.invalidConfiguredOperatingMode,
       requireTypedConfirmationOnSwitch: this.settings.requireTypedConfirmationOnSwitch
     });
-    this.operatingMode = this.operatingModeManager.currentMode();
-    this.settings.operatingMode = this.operatingMode;
+    const currentMode = this.operatingModeManager.currentMode();
+    this.operatingMode = currentMode ?? DEFAULT_OPERATING_MODE;
+    if (currentMode) this.settings.operatingMode = currentMode;
     this.selectedWorkflowId = this.settings.defaultWorkflow;
     this.contextChips = {
       selection: this.settings.includeSelectionByDefault,
@@ -104,8 +107,9 @@ export class AgentRoomController {
     this.panel?.dispose();
   }
 
-  async open(): Promise<void> {
-    await this.ensureFirstLaunchMode();
+  async open(): Promise<boolean> {
+    const modeSelected = await this.ensureFirstLaunchMode();
+    if (!modeSelected) return false;
     if (!this.panel) {
       this.panel = new AgentRoomPanel(this.context.extensionUri, (message) =>
         this.handleWebviewMessage(message)
@@ -118,15 +122,16 @@ export class AgentRoomController {
     }
     await this.ensureTranscript();
     await this.hydrate();
+    return true;
   }
 
   async openRoomSetup(): Promise<void> {
-    await this.open();
+    if (!(await this.open())) return;
     await this.panel?.post({ type: "settingsUpdated", openSetup: true });
   }
 
   async checkCliHealth(): Promise<void> {
-    await this.open();
+    if (!(await this.open())) return;
     this.health = await checkProviderHealth(this.providerRegistry);
     await this.panel?.post({ type: "healthUpdated", health: this.health });
   }
@@ -207,13 +212,13 @@ export class AgentRoomController {
   }
 
   async sendCurrentSelectionToAgent(agentId: string): Promise<void> {
-    await this.open();
+    if (!(await this.open())) return;
     const text = this.selectedTextOrActiveFilePrompt();
     await this.sendToAgent(agentId, await text);
   }
 
   async sendCurrentSelectionToRole(roleId: string): Promise<void> {
-    await this.open();
+    if (!(await this.open())) return;
     const team = new VirtualTeamRegistry(this.profile.virtualAgents);
     const agent = team.agentsWithAnyRole([roleId])[0];
     if (!agent) {
@@ -224,7 +229,7 @@ export class AgentRoomController {
   }
 
   async runWorkflowOnCurrentFile(workflowId: string): Promise<void> {
-    await this.open();
+    if (!(await this.open())) return;
     await this.runWorkflow(workflowId, await this.selectedTextOrActiveFilePrompt());
   }
 
@@ -570,15 +575,17 @@ export class AgentRoomController {
     });
   }
 
-  private async ensureFirstLaunchMode(): Promise<void> {
-    if (!this.settings.firstLaunchShowModePicker || this.operatingModeManager.firstLaunchComplete()) {
-      return;
-    }
-
-    const selected = await this.pickFirstLaunchMode();
-    if (!selected) return;
-    await this.operatingModeManager.initializeMode(selected);
-    await this.setOperatingMode(selected);
+  private async ensureFirstLaunchMode(): Promise<boolean> {
+    const result = await this.operatingModeManager.ensureModeSelectedForOpen({
+      firstLaunchPickerRequired: this.settings.firstLaunchShowModePicker,
+      pickMode: () => this.pickFirstLaunchMode(),
+      showInfoMessage: async (message) => {
+        await vscode.window.showInformationMessage(message);
+      }
+    });
+    if (!result.canOpen) return false;
+    if (result.mode) await this.setOperatingMode(result.mode);
+    return true;
   }
 
   private async pickFirstLaunchMode(): Promise<OperatingMode | undefined> {

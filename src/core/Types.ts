@@ -260,7 +260,8 @@ export interface WebResearchSettings {
 
 /** Snapshot of all agentRoom.* settings as plain data. */
 export interface AgentRoomSettings {
-  operatingMode: OperatingMode;
+  operatingMode?: OperatingMode;
+  invalidConfiguredOperatingMode?: string;
   firstLaunchShowModePicker: boolean;
   workModeEnabled: boolean;
   personalModeEnabled: boolean;

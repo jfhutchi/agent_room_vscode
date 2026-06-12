@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AgentRoomSettings } from "./Types";
-import { tryParseOperatingMode } from "./OperatingMode";
+import { resolveConfiguredOperatingMode } from "./OperatingMode";
 
 function get<T>(config: vscode.WorkspaceConfiguration, key: string, fallback: T): T {
   return config.get<T>(key, fallback);
@@ -8,8 +8,10 @@ function get<T>(config: vscode.WorkspaceConfiguration, key: string, fallback: T)
 
 export function getAgentRoomSettings(): AgentRoomSettings {
   const config = vscode.workspace.getConfiguration("agentRoom");
+  const operatingMode = resolveConfiguredOperatingMode(config.get<unknown>("operatingMode"));
   return {
-    operatingMode: tryParseOperatingMode(get(config, "operatingMode", "personalLocal")),
+    operatingMode: operatingMode.mode,
+    invalidConfiguredOperatingMode: operatingMode.invalidValue,
     firstLaunchShowModePicker: get(config, "firstLaunch.showModePicker", true),
     workModeEnabled: get(config, "workMode.enabled", true),
     personalModeEnabled: get(config, "personalMode.enabled", true),

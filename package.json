@@ -1,12 +1,12 @@
 {
   "name": "agent-room",
   "displayName": "Agent Room",
-  "description": "A professional VS Code multi-agent coding room. Coordinate Claude Code, Codex CLI, and optional web research as named virtual team members with roles and workflows — in one native chat panel, with no terminal spam.",
+  "description": "A professional VS Code multi-agent coding room. Coordinate Claude Code, Codex CLI, and optional web research as named virtual team members with roles and workflows in one native chat panel, with no terminal spam.",
   "version": "0.0.1",
   "publisher": "agent-room-publisher-placeholder",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.91.0"
   },
   "categories": [
     "AI",
@@ -21,28 +21,105 @@
     "chat"
   ],
   "main": "./out/src/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:agentRoom.open",
+    "onCommand:agentRoom.checkCliHealth",
+    "onCommand:agentRoom.openRoomSetup",
+    "onCommand:agentRoom.resetRoleAssignments",
+    "onCommand:agentRoom.exportRoomProfile",
+    "onCommand:agentRoom.importRoomProfile",
+    "onCommand:agentRoom.sendCurrentSelectionToAtlas",
+    "onCommand:agentRoom.sendCurrentSelectionToForge",
+    "onCommand:agentRoom.sendCurrentSelectionToSentinel",
+    "onCommand:agentRoom.sendCurrentSelectionToGauge",
+    "onCommand:agentRoom.sendCurrentSelectionToScout",
+    "onCommand:agentRoom.sendSelectionToAssignedPlanner",
+    "onCommand:agentRoom.sendSelectionToAssignedCoder",
+    "onCommand:agentRoom.sendSelectionToAssignedReviewer",
+    "onCommand:agentRoom.runPlanningWorkflowOnCurrentFile",
+    "onCommand:agentRoom.runFullBuildCycleOnCurrentFile",
+    "onCommand:agentRoom.exportTranscript",
+    "onCommand:agentRoom.clearTranscript",
+    "onCommand:agentRoom.openSettings"
+  ],
   "contributes": {
     "commands": [
-      { "command": "agentRoom.open", "title": "Agent Room: Open" },
-      { "command": "agentRoom.checkCliHealth", "title": "Agent Room: Check CLI Health" },
-      { "command": "agentRoom.openRoomSetup", "title": "Agent Room: Open Room Setup" },
-      { "command": "agentRoom.resetRoleAssignments", "title": "Agent Room: Reset Role Assignments" },
-      { "command": "agentRoom.exportRoomProfile", "title": "Agent Room: Export Room Profile" },
-      { "command": "agentRoom.importRoomProfile", "title": "Agent Room: Import Room Profile" },
-      { "command": "agentRoom.sendCurrentSelectionToAtlas", "title": "Agent Room: Send Current Selection to Atlas" },
-      { "command": "agentRoom.sendCurrentSelectionToForge", "title": "Agent Room: Send Current Selection to Forge" },
-      { "command": "agentRoom.sendCurrentSelectionToSentinel", "title": "Agent Room: Send Current Selection to Sentinel" },
-      { "command": "agentRoom.sendCurrentSelectionToGauge", "title": "Agent Room: Send Current Selection to Gauge" },
-      { "command": "agentRoom.sendCurrentSelectionToScout", "title": "Agent Room: Send Current Selection to Scout" },
-      { "command": "agentRoom.sendSelectionToAssignedPlanner", "title": "Agent Room: Send Current Selection to Assigned Planner" },
-      { "command": "agentRoom.sendSelectionToAssignedCoder", "title": "Agent Room: Send Current Selection to Assigned Coder" },
-      { "command": "agentRoom.sendSelectionToAssignedReviewer", "title": "Agent Room: Send Current Selection to Assigned Reviewer" },
-      { "command": "agentRoom.runPlanningWorkflowOnCurrentFile", "title": "Agent Room: Run Planning Workflow on Current File" },
-      { "command": "agentRoom.runFullBuildCycleOnCurrentFile", "title": "Agent Room: Run Full Build Cycle on Current File" },
-      { "command": "agentRoom.exportTranscript", "title": "Agent Room: Export Transcript" },
-      { "command": "agentRoom.clearTranscript", "title": "Agent Room: Clear Transcript" },
-      { "command": "agentRoom.openSettings", "title": "Agent Room: Open Settings" }
+      {
+        "command": "agentRoom.open",
+        "title": "Agent Room: Open"
+      },
+      {
+        "command": "agentRoom.checkCliHealth",
+        "title": "Agent Room: Check CLI Health"
+      },
+      {
+        "command": "agentRoom.openRoomSetup",
+        "title": "Agent Room: Open Room Setup"
+      },
+      {
+        "command": "agentRoom.resetRoleAssignments",
+        "title": "Agent Room: Reset Role Assignments"
+      },
+      {
+        "command": "agentRoom.exportRoomProfile",
+        "title": "Agent Room: Export Room Profile"
+      },
+      {
+        "command": "agentRoom.importRoomProfile",
+        "title": "Agent Room: Import Room Profile"
+      },
+      {
+        "command": "agentRoom.sendCurrentSelectionToAtlas",
+        "title": "Agent Room: Send Current Selection to Atlas"
+      },
+      {
+        "command": "agentRoom.sendCurrentSelectionToForge",
+        "title": "Agent Room: Send Current Selection to Forge"
+      },
+      {
+        "command": "agentRoom.sendCurrentSelectionToSentinel",
+        "title": "Agent Room: Send Current Selection to Sentinel"
+      },
+      {
+        "command": "agentRoom.sendCurrentSelectionToGauge",
+        "title": "Agent Room: Send Current Selection to Gauge"
+      },
+      {
+        "command": "agentRoom.sendCurrentSelectionToScout",
+        "title": "Agent Room: Send Current Selection to Scout"
+      },
+      {
+        "command": "agentRoom.sendSelectionToAssignedPlanner",
+        "title": "Agent Room: Send Current Selection to Assigned Planner"
+      },
+      {
+        "command": "agentRoom.sendSelectionToAssignedCoder",
+        "title": "Agent Room: Send Current Selection to Assigned Coder"
+      },
+      {
+        "command": "agentRoom.sendSelectionToAssignedReviewer",
+        "title": "Agent Room: Send Current Selection to Assigned Reviewer"
+      },
+      {
+        "command": "agentRoom.runPlanningWorkflowOnCurrentFile",
+        "title": "Agent Room: Run Planning Workflow on Current File"
+      },
+      {
+        "command": "agentRoom.runFullBuildCycleOnCurrentFile",
+        "title": "Agent Room: Run Full Build Cycle on Current File"
+      },
+      {
+        "command": "agentRoom.exportTranscript",
+        "title": "Agent Room: Export Transcript"
+      },
+      {
+        "command": "agentRoom.clearTranscript",
+        "title": "Agent Room: Clear Transcript"
+      },
+      {
+        "command": "agentRoom.openSettings",
+        "title": "Agent Room: Open Settings"
+      }
     ],
     "configuration": {
       "title": "Agent Room",
@@ -64,7 +141,12 @@
         },
         "agentRoom.defaultContextMode": {
           "type": "string",
-          "enum": ["currentPromptOnly", "transcriptSummary", "lastMessages", "fullTranscriptBudgeted"],
+          "enum": [
+            "currentPromptOnly",
+            "transcriptSummary",
+            "lastMessages",
+            "fullTranscriptBudgeted"
+          ],
           "default": "lastMessages",
           "description": "How much transcript context is included in each agent turn."
         },
@@ -110,13 +192,20 @@
         },
         "agentRoom.codex.sandbox": {
           "type": "string",
-          "enum": ["read-only", "workspace-write"],
+          "enum": [
+            "read-only",
+            "workspace-write"
+          ],
           "default": "workspace-write",
           "description": "Sandbox mode passed to Codex CLI when supported."
         },
         "agentRoom.codex.approval": {
           "type": "string",
-          "enum": ["untrusted", "on-request", "never"],
+          "enum": [
+            "untrusted",
+            "on-request",
+            "never"
+          ],
           "default": "on-request",
           "description": "Approval policy passed to Codex CLI when supported."
         },
@@ -127,13 +216,20 @@
         },
         "agentRoom.transcriptStorage": {
           "type": "string",
-          "enum": ["memory", "workspace", "global"],
+          "enum": [
+            "memory",
+            "workspace",
+            "global"
+          ],
           "default": "workspace",
           "description": "Where transcripts are stored."
         },
         "agentRoom.roomProfileStorage": {
           "type": "string",
-          "enum": ["workspace", "global"],
+          "enum": [
+            "workspace",
+            "global"
+          ],
           "default": "workspace",
           "description": "Where the room profile (team, roles, workflows) is stored."
         },
@@ -164,7 +260,12 @@
         },
         "agentRoom.logging.level": {
           "type": "string",
-          "enum": ["error", "info", "debug", "trace"],
+          "enum": [
+            "error",
+            "info",
+            "debug",
+            "trace"
+          ],
           "default": "error",
           "description": "Logging level for the Agent Room output channel."
         },
@@ -203,15 +304,51 @@
           "default": true,
           "description": "Ask for confirmation before running deep-reasoning model tiers."
         },
-        "agentRoom.models.claude.fast": { "type": "string", "default": "", "description": "Concrete Claude model for the fast tier. Empty = provider default." },
-        "agentRoom.models.claude.balanced": { "type": "string", "default": "", "description": "Concrete Claude model for the balanced tier. Empty = provider default." },
-        "agentRoom.models.claude.deepReasoning": { "type": "string", "default": "", "description": "Concrete Claude model for the deepReasoning tier. Empty = provider default." },
-        "agentRoom.models.claude.coding": { "type": "string", "default": "", "description": "Concrete Claude model for the coding tier. Empty = provider default." },
-        "agentRoom.models.codex.fast": { "type": "string", "default": "", "description": "Concrete Codex model for the fast tier. Empty = provider default." },
-        "agentRoom.models.codex.balanced": { "type": "string", "default": "", "description": "Concrete Codex model for the balanced tier. Empty = provider default." },
-        "agentRoom.models.codex.deepReasoning": { "type": "string", "default": "", "description": "Concrete Codex model for the deepReasoning tier. Empty = provider default." },
-        "agentRoom.models.codex.coding": { "type": "string", "default": "", "description": "Concrete Codex model for the coding tier. Empty = provider default." },
-        "agentRoom.models.openAiWebSearch.research": { "type": "string", "default": "", "description": "OpenAI model used by the optional Web Research provider. Empty = not configured." },
+        "agentRoom.models.claude.fast": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Claude model for the fast tier. Empty = provider default."
+        },
+        "agentRoom.models.claude.balanced": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Claude model for the balanced tier. Empty = provider default."
+        },
+        "agentRoom.models.claude.deepReasoning": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Claude model for the deepReasoning tier. Empty = provider default."
+        },
+        "agentRoom.models.claude.coding": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Claude model for the coding tier. Empty = provider default."
+        },
+        "agentRoom.models.codex.fast": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Codex model for the fast tier. Empty = provider default."
+        },
+        "agentRoom.models.codex.balanced": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Codex model for the balanced tier. Empty = provider default."
+        },
+        "agentRoom.models.codex.deepReasoning": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Codex model for the deepReasoning tier. Empty = provider default."
+        },
+        "agentRoom.models.codex.coding": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete Codex model for the coding tier. Empty = provider default."
+        },
+        "agentRoom.models.openAiWebSearch.research": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI model used by the optional Web Research provider. Empty = not configured."
+        },
         "agentRoom.webResearch.enabled": {
           "type": "boolean",
           "default": false,
@@ -229,7 +366,10 @@
         },
         "agentRoom.webResearch.apiKeySource": {
           "type": "string",
-          "enum": ["environment", "vscodeSecretStorage"],
+          "enum": [
+            "environment",
+            "vscodeSecretStorage"
+          ],
           "default": "environment",
           "description": "Where the user-owned OpenAI API key for web research is read from."
         },
@@ -255,19 +395,27 @@
         },
         "agentRoom.webResearch.allowedDomains": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "If non-empty, Scout is instructed to prefer these domains."
         },
         "agentRoom.webResearch.blockedDomains": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Domains Scout is instructed to avoid."
         },
         "agentRoom.webResearch.searchFreshness": {
           "type": "string",
-          "enum": ["auto", "latest", "stableDocs"],
+          "enum": [
+            "auto",
+            "latest",
+            "stableDocs"
+          ],
           "default": "auto",
           "description": "Freshness preference for web research."
         }
@@ -279,11 +427,11 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src test",
-    "test": "npm run compile && node --test out/test/unit/"
+    "test": "npm run compile && node --test out/test/unit/*.js out/test/*.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "1.91.0",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.9.0",
     "typescript": "^5.5.4",

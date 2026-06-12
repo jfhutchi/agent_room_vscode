@@ -11,6 +11,7 @@ import {
   isOperatingMode,
   parseOperatingMode,
   profileFileNameForMode,
+  resolveControllerStartupMode,
   resolveConfiguredOperatingMode
 } from "../../src/core/OperatingMode";
 
@@ -47,6 +48,17 @@ test("invalid configured mode hybrid does not silently become personalLocal", ()
     invalidConfiguredMode: resolved.invalidValue
   });
   assert.equal(manager.currentMode(), undefined);
+});
+
+test("controller startup has no active mode before required first-launch selection", () => {
+  const manager = new OperatingModeManager({ workspaceState: new MemoryState() });
+  assert.equal(resolveControllerStartupMode(manager, true), undefined);
+});
+
+test("controller startup uses explicit workspace mode after selection", async () => {
+  const manager = new OperatingModeManager({ workspaceState: new MemoryState() });
+  await manager.initializeMode("personalLocal");
+  assert.equal(resolveControllerStartupMode(manager, true), "personalLocal");
 });
 
 test("first-launch picker exposes only Work, Personal, and Learn More with separation text", () => {

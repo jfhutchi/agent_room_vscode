@@ -140,6 +140,21 @@ export function configuredOperatingModeErrorMessage(value: string): string {
   return `Configured Agent Room operating mode "${value}" is invalid. Choose Work Mode or Personal Mode before using Agent Room.`;
 }
 
+export function resolveControllerStartupMode(
+  manager: OperatingModeManager,
+  firstLaunchPickerRequired: boolean
+): OperatingMode | undefined {
+  if (manager.hasInvalidConfiguredMode()) return undefined;
+  if (
+    firstLaunchPickerRequired &&
+    !manager.firstLaunchComplete() &&
+    !manager.hasWorkspaceModeSelected()
+  ) {
+    return undefined;
+  }
+  return manager.currentMode();
+}
+
 export function modeTitle(mode: OperatingMode): string {
   return mode === "workCopilotNative" ? "Agent Room - Work Mode" : "Agent Room - Personal Mode";
 }

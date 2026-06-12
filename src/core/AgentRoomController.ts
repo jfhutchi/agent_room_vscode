@@ -32,7 +32,6 @@ import { collectWorkspaceContext } from "./WorkspaceContext";
 import { runAgentTurn } from "./AgentRunner";
 import { checkProviderHealth } from "./HealthCheck";
 import {
-  DEFAULT_OPERATING_MODE,
   FIRST_LAUNCH_MODE_PICKER_ITEMS,
   OperatingModeManager,
   SWITCH_MODE_PICKER_ITEMS,
@@ -41,18 +40,19 @@ import {
   modeChangedMessage,
   modeDescription,
   modeTitle,
+  resolveControllerStartupMode,
   type OperatingMode
 } from "./OperatingMode";
 
 export class AgentRoomController {
   private panel: AgentRoomPanel | undefined;
   private settings: AgentRoomSettings;
-  private operatingMode: OperatingMode;
+  private operatingMode: OperatingMode | undefined;
   private operatingModeManager: OperatingModeManager;
-  private profile: RoomProfile = createDefaultRoomProfile();
-  private profileStore: RoomProfileStore;
+  private profile: RoomProfile | undefined;
+  private profileStore: RoomProfileStore | undefined;
   private transcriptStore: TranscriptStore;
-  private providerRegistry: ProviderRegistry;
+  private providerRegistry: ProviderRegistry | undefined;
   private health: Record<string, unknown> = {};
   private abortController: AbortController | undefined;
   private isRunning = false;
@@ -76,9 +76,11 @@ export class AgentRoomController {
       invalidConfiguredMode: this.settings.invalidConfiguredOperatingMode,
       requireTypedConfirmationOnSwitch: this.settings.requireTypedConfirmationOnSwitch
     });
-    const currentMode = this.operatingModeManager.currentMode();
-    this.operatingMode = currentMode ?? DEFAULT_OPERATING_MODE;
-    if (currentMode) this.settings.operatingMode = currentMode;
+    this.operatingMode = resolveControllerStartupMode(
+      this.operatingModeManager,
+      this.settings.firstLaunchShowModePicker
+    );
+    if (this.operatingMode) this.settings.operatingMode = this.operatingMode;
     this.selectedWorkflowId = this.settings.defaultWorkflow;
     this.contextChips = {
       selection: this.settings.includeSelectionByDefault,
@@ -87,9 +89,7 @@ export class AgentRoomController {
     };
     const logger = new Logger(output);
     logger.setLevel(this.settings.loggingLevel);
-    this.profileStore = this.createProfileStore();
     this.transcriptStore = this.createTranscriptStore();
-    this.providerRegistry = this.createProviderRegistry();
   }
 
   static async create(
@@ -97,8 +97,9 @@ export class AgentRoomController {
     output: vscode.OutputChannel
   ): Promise<AgentRoomController> {
     const controller = new AgentRoomController(context, output);
-    controller.profile = await controller.profileStore.load();
-    controller.applySettingsToProfile();
+    if (controller.operatingMode) {
+      await controller.initializeModeResources(controller.operatingMode);
+    }
     return controller;
   }
 
@@ -132,7 +133,7 @@ export class AgentRoomController {
 
   async checkCliHealth(): Promise<void> {
     if (!(await this.open())) return;
-    this.health = await checkProviderHealth(this.providerRegistry);
+    this.health = await checkProviderHealth(this.requireProviderRegistry());
     await this.panel?.post({ type: "healthUpdated", health: this.health });
   }
 
@@ -182,22 +183,25 @@ export class AgentRoomController {
   }
 
   async resetRoleAssignments(): Promise<void> {
-    this.profile = createDefaultRoomProfile(this.operatingMode);
+    if (!(await this.open())) return;
+    this.profile = createDefaultRoomProfile(this.requireOperatingMode());
     this.applySettingsToProfile();
-    await this.profileStore.save(this.profile);
+    await this.requireProfileStore().save(this.requireProfile());
     await this.hydrate();
   }
 
   async exportRoomProfile(): Promise<void> {
+    if (!(await this.open())) return;
     const uri = await vscode.window.showSaveDialog({
       defaultUri: this.workspaceUri("agent-room-profile.json"),
       filters: { JSON: ["json"] }
     });
     if (!uri) return;
-    await fs.writeFile(uri.fsPath, JSON.stringify(this.profile, null, 2), "utf8");
+    await fs.writeFile(uri.fsPath, JSON.stringify(this.requireProfile(), null, 2), "utf8");
   }
 
   async importRoomProfile(): Promise<void> {
+    if (!(await this.open())) return;
     const files = await vscode.window.showOpenDialog({
       canSelectMany: false,
       filters: { JSON: ["json"] }
@@ -205,9 +209,9 @@ export class AgentRoomController {
     const file = files?.[0];
     if (!file) return;
     const text = await fs.readFile(file.fsPath, "utf8");
-    this.profile = this.profileStore.parseImported(text);
+    this.profile = this.requireProfileStore().parseImported(text);
     this.applySettingsToProfile();
-    await this.profileStore.save(this.profile);
+    await this.requireProfileStore().save(this.requireProfile());
     await this.hydrate();
   }
 
@@ -251,6 +255,7 @@ export class AgentRoomController {
   }
 
   async clearTranscript(): Promise<void> {
+    if (!this.operatingMode) return;
     await this.transcriptStore.clearCurrent();
     await this.hydrate();
   }

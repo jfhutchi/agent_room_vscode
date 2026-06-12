@@ -1,5 +1,6 @@
 export const COMMAND_IDS = [
   "agentRoom.open",
+  "agentRoom.switchOperatingMode",
   "agentRoom.checkCliHealth",
   "agentRoom.openRoomSetup",
   "agentRoom.resetRoleAssignments",

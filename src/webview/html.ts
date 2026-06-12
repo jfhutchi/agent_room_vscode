@@ -30,6 +30,10 @@ export function getAgentRoomHtml(webview: vscode.Webview, extensionUri: vscode.U
         <div class="eyebrow">Agent Room</div>
         <h1 id="workspaceName">Workspace</h1>
       </div>
+      <div class="mode-badge" aria-label="Operating mode">
+        <div id="modeTitle">Agent Room - Personal Mode</div>
+        <div id="modeDescription">Using local Claude Code and Codex CLI providers.</div>
+      </div>
       <div class="header-actions">
         <button id="healthButton" type="button">Check Health</button>
         <button id="setupButton" type="button" aria-expanded="false">Room Setup</button>

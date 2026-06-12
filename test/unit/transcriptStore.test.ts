@@ -12,6 +12,7 @@ test("transcript store creates, appends, serializes, and exports markdown", asyn
   try {
     const store = new TranscriptStore({ mode: "workspace", workspaceRoot: workspace });
     const transcript = await store.create({
+      operatingMode: "personalLocal",
       workspacePath: workspace,
       workspaceName: "agent-room",
       gitBranch: "main",
@@ -42,6 +43,36 @@ test("transcript store creates, appends, serializes, and exports markdown", asyn
 
     const json = store.exportJson(transcript.id);
     assert.equal(JSON.parse(json).messages.length, 1);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("transcript store creates distinct mode-tagged transcript segments", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "agent-room-"));
+  try {
+    const store = new TranscriptStore({ mode: "workspace", workspaceRoot: workspace });
+    const personal = await store.create({
+      operatingMode: "personalLocal",
+      workspacePath: workspace,
+      workspaceName: "agent-room",
+      roomProfileSnapshot: createDefaultRoomProfile("personalLocal"),
+      workflowId: "manual",
+      settingsSnapshot: {}
+    });
+    const work = await store.create({
+      operatingMode: "workCopilotNative",
+      workspacePath: workspace,
+      workspaceName: "agent-room",
+      roomProfileSnapshot: createDefaultRoomProfile("workCopilotNative"),
+      workflowId: "manual",
+      settingsSnapshot: {}
+    });
+
+    assert.notEqual(personal.id, work.id);
+    assert.equal(store.current()?.id, work.id);
+    assert.equal(store.get(personal.id)?.operatingMode, "personalLocal");
+    assert.equal(store.get(work.id)?.operatingMode, "workCopilotNative");
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

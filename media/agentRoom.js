@@ -4,6 +4,9 @@
     profile: null,
     transcript: null,
     settings: null,
+    operatingMode: "personalLocal",
+    operatingModeTitle: "Agent Room - Personal Mode",
+    operatingModeDescription: "Using local Claude Code and Codex CLI providers.",
     health: {},
     selectedWorkflowId: "manual",
     safetyMode: "workspaceWriteWithApproval",
@@ -14,6 +17,8 @@
 
   const el = {
     workspaceName: document.getElementById("workspaceName"),
+    modeTitle: document.getElementById("modeTitle"),
+    modeDescription: document.getElementById("modeDescription"),
     health: document.getElementById("providerHealth"),
     workflow: document.getElementById("workflowSelect"),
     safety: document.getElementById("safetySelect"),
@@ -66,6 +71,11 @@
       if (health?.warnings?.length) chip.title = health.warnings.join("\n");
       el.health.appendChild(chip);
     }
+  }
+
+  function renderMode() {
+    el.modeTitle.textContent = text(state.operatingModeTitle);
+    el.modeDescription.textContent = text(state.operatingModeDescription);
   }
 
   function renderWorkflows() {
@@ -207,7 +217,7 @@
       return;
     }
     el.advisor.classList.remove("hidden");
-    el.advisor.innerHTML = "";
+    el.advisor.textContent = "";
     const title = document.createElement("div");
     title.className = "advisor-title";
     title.textContent = `Conductor recommends ${recommendation.workflowName}`;
@@ -230,6 +240,7 @@
 
   function renderAll() {
     if (state.transcript?.workspaceName) el.workspaceName.textContent = state.transcript.workspaceName;
+    renderMode();
     renderHealth();
     renderWorkflows();
     renderTeam();
@@ -244,6 +255,10 @@
         profile: message.profile,
         transcript: message.transcript,
         settings: message.settings,
+        operatingMode: message.operatingMode || "personalLocal",
+        operatingModeTitle: message.operatingModeTitle || "Agent Room - Personal Mode",
+        operatingModeDescription:
+          message.operatingModeDescription || "Using local Claude Code and Codex CLI providers.",
         health: message.health || {},
         selectedWorkflowId: message.selectedWorkflowId || "manual",
         safetyMode: message.safetyMode || "workspaceWriteWithApproval",

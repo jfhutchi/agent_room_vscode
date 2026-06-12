@@ -7,6 +7,7 @@
 
 import { ROLE_IDS } from "./RoleRegistry";
 import { ProviderId, ProviderProfile, RoleId, VirtualAgent, VirtualAgentId } from "./Types";
+import { DEFAULT_OPERATING_MODE, type OperatingMode } from "./OperatingMode";
 
 export const AGENT_IDS = {
   user: "user",
@@ -18,7 +19,26 @@ export const AGENT_IDS = {
   conductor: "conductor"
 } as const;
 
-export function defaultProviders(): ProviderProfile[] {
+export function defaultProviders(mode: OperatingMode = DEFAULT_OPERATING_MODE): ProviderProfile[] {
+  if (mode === "workCopilotNative") {
+    return [
+      {
+        id: "copilotNative",
+        displayName: "GitHub Copilot Native",
+        kind: "copilot",
+        enabled: true
+      },
+      {
+        id: "copilotCustomAgent",
+        displayName: "Copilot Custom Agent",
+        kind: "copilot",
+        enabled: true
+      },
+      { id: "human", displayName: "Human", kind: "human", enabled: true },
+      { id: "internalConductor", displayName: "Conductor", kind: "internal", enabled: true }
+    ];
+  }
+
   return [
     {
       id: "claudeCodeCli",
@@ -45,7 +65,13 @@ export function defaultProviders(): ProviderProfile[] {
   ];
 }
 
-export function defaultVirtualAgents(): VirtualAgent[] {
+export function defaultVirtualAgents(mode: OperatingMode = DEFAULT_OPERATING_MODE): VirtualAgent[] {
+  const planningProvider: ProviderId = mode === "workCopilotNative" ? "copilotNative" : "claudeCodeCli";
+  const codingProvider: ProviderId = mode === "workCopilotNative" ? "copilotNative" : "claudeCodeCli";
+  const reviewProvider: ProviderId = mode === "workCopilotNative" ? "copilotNative" : "codexCli";
+  const testingProvider: ProviderId = mode === "workCopilotNative" ? "copilotNative" : "codexCli";
+  const researchProvider: ProviderId = mode === "workCopilotNative" ? "copilotCustomAgent" : "openAiWebSearch";
+
   return [
     {
       id: AGENT_IDS.user,
@@ -59,7 +85,7 @@ export function defaultVirtualAgents(): VirtualAgent[] {
       id: AGENT_IDS.atlas,
       displayName: "Atlas",
       description: "High-level planner and system designer.",
-      providerId: "claudeCodeCli",
+      providerId: planningProvider,
       enabled: true,
       assignedRoleIds: [ROLE_IDS.planner, ROLE_IDS.architect, ROLE_IDS.explainer],
       preferredModelTier: "balanced"
@@ -68,7 +94,7 @@ export function defaultVirtualAgents(): VirtualAgent[] {
       id: AGENT_IDS.forge,
       displayName: "Forge",
       description: "Implementation-focused coding agent.",
-      providerId: "claudeCodeCli",
+      providerId: codingProvider,
       enabled: true,
       assignedRoleIds: [ROLE_IDS.coder, ROLE_IDS.documentationWriter],
       preferredModelTier: "coding"
@@ -77,7 +103,7 @@ export function defaultVirtualAgents(): VirtualAgent[] {
       id: AGENT_IDS.sentinel,
       displayName: "Sentinel",
       description: "Skeptical reviewer and security/code-quality auditor.",
-      providerId: "codexCli",
+      providerId: reviewProvider,
       enabled: true,
       assignedRoleIds: [
         ROLE_IDS.reviewer,
@@ -90,7 +116,7 @@ export function defaultVirtualAgents(): VirtualAgent[] {
       id: AGENT_IDS.gauge,
       displayName: "Gauge",
       description: "Test coverage and verification agent.",
-      providerId: "codexCli",
+      providerId: testingProvider,
       enabled: true,
       assignedRoleIds: [ROLE_IDS.tester, ROLE_IDS.devOpsReviewer],
       preferredModelTier: "testing"
@@ -100,7 +126,7 @@ export function defaultVirtualAgents(): VirtualAgent[] {
       displayName: "Scout",
       description:
         "Optional web research and source-checking agent. Disabled until Web Research is configured.",
-      providerId: "openAiWebSearch",
+      providerId: researchProvider,
       enabled: false,
       assignedRoleIds: [
         ROLE_IDS.webResearcher,

@@ -4,6 +4,8 @@
  * treated as untrusted input.
  */
 
+import { isOperatingMode, type OperatingMode } from "../core/OperatingMode";
+
 export type WebviewToExtensionMessage =
   | { type: "ready" }
   | { type: "sendMessage"; text: string; replyToMessageId?: string }
@@ -14,6 +16,7 @@ export type WebviewToExtensionMessage =
   | { type: "clearTranscript" }
   | { type: "exportTranscript"; format: "markdown" | "json" }
   | { type: "checkHealth" }
+  | { type: "switchOperatingMode"; mode: OperatingMode }
   | {
       type: "updateUiState";
       state: {
@@ -114,6 +117,10 @@ export function validateWebviewMessage(raw: unknown): WebviewToExtensionMessage 
     case "exportTranscript":
       if (raw.format !== "markdown" && raw.format !== "json") return null;
       return { type: "exportTranscript", format: raw.format };
+
+    case "switchOperatingMode":
+      if (!isOperatingMode(raw.mode)) return null;
+      return { type: "switchOperatingMode", mode: raw.mode };
 
     case "updateUiState": {
       if (!isObject(raw.state)) return null;

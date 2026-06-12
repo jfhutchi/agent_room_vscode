@@ -1,6 +1,6 @@
 /**
  * Room profile persistence: team members, roles, workflows, and provider
- * profiles. Workspace mode writes `.agent-room/profiles/room-profile.json`
+ * profiles. Workspace mode writes per-mode files under `.agent-room/profiles/`
  * (safe to commit and share); global mode uses a memento-like store.
  */
 
@@ -9,18 +9,23 @@ import * as path from "path";
 import { builtInRoles } from "./RoleRegistry";
 import { defaultProviders, defaultVirtualAgents } from "./VirtualTeamRegistry";
 import { builtInWorkflows, WORKFLOW_IDS } from "./WorkflowRegistry";
-import { newId, RoomProfile } from "./Types";
+import { newId, type RoomProfile, type ProviderProfile, type VirtualAgent } from "./Types";
 import { ensureAgentRoomDir } from "../utils/paths";
+import {
+  DEFAULT_OPERATING_MODE,
+  type OperatingMode,
+  isProviderValidForMode,
+  modeName,
+  profileFileNameForMode
+} from "./OperatingMode";
 
-const PROFILE_FILE = "room-profile.json";
-
-export function createDefaultRoomProfile(): RoomProfile {
+export function createDefaultRoomProfile(operatingMode: OperatingMode = DEFAULT_OPERATING_MODE): RoomProfile {
   return {
     id: newId("profile"),
     name: "Default Room",
     description: "Default Agent Room team: Atlas, Forge, Sentinel, Gauge, Scout, Conductor.",
-    providers: defaultProviders(),
-    virtualAgents: defaultVirtualAgents(),
+    providers: defaultProviders(operatingMode),
+    virtualAgents: defaultVirtualAgents(operatingMode),
     roles: builtInRoles(),
     workflows: builtInWorkflows(),
     defaultWorkflowId: WORKFLOW_IDS.manual,
@@ -36,6 +41,7 @@ export interface KeyValueStore {
 
 export interface RoomProfileStoreOptions {
   mode: "workspace" | "global";
+  operatingMode?: OperatingMode;
   workspaceRoot?: string;
   globalStore?: KeyValueStore;
 }
@@ -46,39 +52,41 @@ export class RoomProfileStore {
   constructor(private readonly options: RoomProfileStoreOptions) {}
 
   async load(): Promise<RoomProfile> {
-    try {
-      if (this.options.mode === "workspace" && this.options.workspaceRoot) {
-        const file = path.join(
-          this.options.workspaceRoot,
-          ".agent-room",
-          "profiles",
-          PROFILE_FILE
-        );
+    if (this.options.mode === "workspace" && this.options.workspaceRoot) {
+      const file = path.join(
+        this.options.workspaceRoot,
+        ".agent-room",
+        "profiles",
+        profileFileNameForMode(this.operatingMode())
+      );
+      try {
         const text = await fs.readFile(file, "utf8");
         return this.validate(JSON.parse(text));
+      } catch (error) {
+        if (isMissingFileError(error)) return createDefaultRoomProfile(this.operatingMode());
+        throw error;
       }
-      if (this.options.mode === "global" && this.options.globalStore) {
-        const stored = this.options.globalStore.get<RoomProfile>(GLOBAL_KEY);
-        if (stored) return this.validate(stored);
-      }
-    } catch {
-      // Missing or corrupt profile -> fall through to defaults.
     }
-    return createDefaultRoomProfile();
+    if (this.options.mode === "global" && this.options.globalStore) {
+      const stored = this.options.globalStore.get<RoomProfile>(this.globalKey());
+      if (stored) return this.validate(stored);
+    }
+    return createDefaultRoomProfile(this.operatingMode());
   }
 
   async save(profile: RoomProfile): Promise<void> {
+    const validated = this.validate(profile);
     if (this.options.mode === "workspace" && this.options.workspaceRoot) {
       const dir = await ensureAgentRoomDir(this.options.workspaceRoot, "profiles");
       await fs.writeFile(
-        path.join(dir, PROFILE_FILE),
-        JSON.stringify(profile, null, 2),
+        path.join(dir, profileFileNameForMode(this.operatingMode())),
+        JSON.stringify(validated, null, 2),
         "utf8"
       );
       return;
     }
     if (this.options.globalStore) {
-      await this.options.globalStore.update(GLOBAL_KEY, profile);
+      await this.options.globalStore.update(this.globalKey(), validated);
     }
   }
 
@@ -105,15 +113,19 @@ export class RoomProfileStore {
     if (!Array.isArray(p.virtualAgents) || !Array.isArray(p.roles)) {
       throw new Error("Profile is missing virtualAgents or roles.");
     }
-    const defaults = createDefaultRoomProfile();
+    const defaults = createDefaultRoomProfile(this.operatingMode());
+    const providers =
+      Array.isArray(p.providers) && p.providers.length > 0 ? p.providers : defaults.providers;
+    const virtualAgents = p.virtualAgents;
+    this.validateModeProviderReferences(providers, virtualAgents);
     // Merge tolerant: anything missing falls back to defaults so old exports
     // keep working after upgrades.
     return {
       id: typeof p.id === "string" ? p.id : defaults.id,
       name: typeof p.name === "string" ? p.name : defaults.name,
       description: typeof p.description === "string" ? p.description : defaults.description,
-      providers: Array.isArray(p.providers) && p.providers.length > 0 ? p.providers : defaults.providers,
-      virtualAgents: p.virtualAgents,
+      providers,
+      virtualAgents,
       roles: p.roles,
       workflows:
         Array.isArray(p.workflows) && p.workflows.length > 0 ? p.workflows : defaults.workflows,
@@ -123,4 +135,43 @@ export class RoomProfileStore {
         typeof p.extraRoomInstructions === "string" ? p.extraRoomInstructions : ""
     };
   }
+
+  private validateModeProviderReferences(
+    providers: ProviderProfile[],
+    virtualAgents: VirtualAgent[]
+  ): void {
+    const mode = this.operatingMode();
+    const validProviderIds = new Set<string>();
+    for (const provider of providers) {
+      if (!isProviderValidForMode(provider.id, mode)) {
+        throw new Error(`Provider ${provider.id} is not valid in ${modeName(mode)}.`);
+      }
+      validProviderIds.add(provider.id);
+    }
+    for (const agent of virtualAgents) {
+      if (!isProviderValidForMode(agent.providerId, mode)) {
+        throw new Error(`Provider ${agent.providerId} is not valid in ${modeName(mode)}.`);
+      }
+      if (!validProviderIds.has(agent.providerId)) {
+        throw new Error(`Profile references unknown provider ${agent.providerId}.`);
+      }
+    }
+  }
+
+  private operatingMode(): OperatingMode {
+    return this.options.operatingMode ?? DEFAULT_OPERATING_MODE;
+  }
+
+  private globalKey(): string {
+    return `${GLOBAL_KEY}.${this.operatingMode()}`;
+  }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "ENOENT"
+  );
 }

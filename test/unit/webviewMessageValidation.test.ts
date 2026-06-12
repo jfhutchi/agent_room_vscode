@@ -8,6 +8,10 @@ test("webview validation accepts known commands", () => {
     type: "exportTranscript",
     format: "json"
   });
+  assert.deepEqual(
+    validateWebviewMessage({ type: "switchOperatingMode", mode: "workCopilotNative" }),
+    { type: "switchOperatingMode", mode: "workCopilotNative" }
+  );
 });
 
 test("webview validation rejects unknown commands", () => {
@@ -17,4 +21,6 @@ test("webview validation rejects unknown commands", () => {
 test("webview validation rejects malformed payloads", () => {
   assert.equal(validateWebviewMessage({ type: "sendMessage", text: "" }), null);
   assert.equal(validateWebviewMessage({ type: "updateRoleAssignment", agentId: "atlas" }), null);
+  assert.equal(validateWebviewMessage({ type: "switchOperatingMode", mode: "hybrid" }), null);
+  assert.equal(validateWebviewMessage({ type: "switchOperatingMode" }), null);
 });

@@ -5,13 +5,18 @@
  * `vscode` module so it can be exercised directly by unit tests.
  */
 
-export type ProviderKind = "localCli" | "apiResearch" | "human" | "internal";
+import type { OperatingMode } from "./OperatingMode";
+
+export type ProviderKind = "localCli" | "apiResearch" | "copilot" | "human" | "internal";
 
 /** Well-known provider ids plus room for user-defined providers. */
 export type ProviderId =
   | "claudeCodeCli"
   | "codexCli"
   | "openAiWebSearch"
+  | "copilotNative"
+  | "copilotCustomAgent"
+  | "copilotAgentSession"
   | "human"
   | "internalConductor"
   | (string & {});
@@ -155,6 +160,7 @@ export interface AgentRoomMessage {
   participantId: string;
   displayName: string;
   providerId?: ProviderId;
+  operatingMode?: OperatingMode;
   roleIds: RoleId[];
   roleNames: string[];
   workflowId?: WorkflowId;
@@ -176,6 +182,7 @@ export interface Transcript {
   workspacePath?: string;
   workspaceName?: string;
   gitBranch?: string;
+  operatingMode?: OperatingMode;
   roomProfileSnapshot: RoomProfile;
   workflowId?: WorkflowId;
   messages: AgentRoomMessage[];
@@ -253,6 +260,11 @@ export interface WebResearchSettings {
 
 /** Snapshot of all agentRoom.* settings as plain data. */
 export interface AgentRoomSettings {
+  operatingMode: OperatingMode;
+  firstLaunchShowModePicker: boolean;
+  workModeEnabled: boolean;
+  personalModeEnabled: boolean;
+  requireTypedConfirmationOnSwitch: boolean;
   claudeExecutable: string;
   codexExecutable: string;
   defaultWorkflow: string;

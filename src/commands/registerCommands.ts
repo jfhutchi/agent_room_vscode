@@ -5,6 +5,7 @@ import { AgentRoomCommandId } from "./commandIds";
 export function registerCommands(context: vscode.ExtensionContext, controller: AgentRoomController): void {
   const registrations: Array<[AgentRoomCommandId, () => unknown]> = [
     ["agentRoom.open", () => controller.open()],
+    ["agentRoom.switchOperatingMode", () => controller.switchOperatingMode()],
     ["agentRoom.checkCliHealth", () => controller.checkCliHealth()],
     ["agentRoom.openRoomSetup", () => controller.openRoomSetup()],
     ["agentRoom.resetRoleAssignments", () => controller.resetRoleAssignments()],

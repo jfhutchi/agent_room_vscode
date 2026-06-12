@@ -23,6 +23,7 @@
   "main": "./out/src/extension.js",
   "activationEvents": [
     "onCommand:agentRoom.open",
+    "onCommand:agentRoom.switchOperatingMode",
     "onCommand:agentRoom.checkCliHealth",
     "onCommand:agentRoom.openRoomSetup",
     "onCommand:agentRoom.resetRoleAssignments",
@@ -47,6 +48,10 @@
       {
         "command": "agentRoom.open",
         "title": "Agent Room: Open"
+      },
+      {
+        "command": "agentRoom.switchOperatingMode",
+        "title": "Agent Room: Switch Operating Mode"
       },
       {
         "command": "agentRoom.checkCliHealth",
@@ -124,6 +129,35 @@
     "configuration": {
       "title": "Agent Room",
       "properties": {
+        "agentRoom.operatingMode": {
+          "type": "string",
+          "enum": [
+            "workCopilotNative",
+            "personalLocal"
+          ],
+          "default": "personalLocal",
+          "description": "Default operating mode for this workspace. After first launch, use Agent Room: Switch Operating Mode to change modes."
+        },
+        "agentRoom.firstLaunch.showModePicker": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Work / Copilot Native vs Personal / Local CLI mode picker on first launch for each workspace."
+        },
+        "agentRoom.workMode.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Work / Copilot Native mode as a selectable operating mode."
+        },
+        "agentRoom.personalMode.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Personal / Local CLI mode as a selectable operating mode."
+        },
+        "agentRoom.modeSeparation.requireTypedConfirmationOnSwitch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require typed confirmation before switching a workspace from Work Mode to Personal Mode."
+        },
         "agentRoom.claude.executable": {
           "type": "string",
           "default": "claude",

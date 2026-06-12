@@ -10,6 +10,7 @@ import {
 } from "./Types";
 import { ensureAgentRoomDir, safeFileName } from "../utils/paths";
 import { mdHeading } from "../utils/markdown";
+import type { OperatingMode } from "./OperatingMode";
 
 export interface TranscriptStoreOptions {
   mode: "memory" | "workspace" | "global";
@@ -21,6 +22,7 @@ export interface TranscriptStoreOptions {
 }
 
 export interface CreateTranscriptInput {
+  operatingMode: OperatingMode;
   workspacePath?: string;
   workspaceName?: string;
   gitBranch?: string;
@@ -55,6 +57,7 @@ export class TranscriptStore {
       workspacePath: input.workspacePath,
       workspaceName: input.workspaceName,
       gitBranch: input.gitBranch,
+      operatingMode: input.operatingMode,
       roomProfileSnapshot: input.roomProfileSnapshot,
       workflowId: input.workflowId,
       messages: [],
@@ -88,6 +91,7 @@ export class TranscriptStore {
       participantId: input.participantId,
       displayName: input.displayName,
       providerId: input.providerId,
+      operatingMode: input.operatingMode,
       roleIds: input.roleIds,
       roleNames: input.roleNames,
       workflowId: input.workflowId,

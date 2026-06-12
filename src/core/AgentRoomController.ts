@@ -31,16 +31,31 @@ import { WorkflowRunner } from "./WorkflowRunner";
 import { collectWorkspaceContext } from "./WorkspaceContext";
 import { runAgentTurn } from "./AgentRunner";
 import { checkProviderHealth } from "./HealthCheck";
+import {
+  FIRST_LAUNCH_MODE_PICKER_ITEMS,
+  OperatingModeManager,
+  SWITCH_MODE_PICKER_ITEMS,
+  WORK_TO_PERSONAL_CONFIRMATION_TEXT,
+  WORK_TO_PERSONAL_WARNING,
+  modeChangedMessage,
+  modeDescription,
+  modeTitle,
+  type OperatingMode
+} from "./OperatingMode";
 
 export class AgentRoomController {
   private panel: AgentRoomPanel | undefined;
   private settings: AgentRoomSettings;
+  private operatingMode: OperatingMode;
+  private operatingModeManager: OperatingModeManager;
   private profile: RoomProfile = createDefaultRoomProfile();
   private profileStore: RoomProfileStore;
   private transcriptStore: TranscriptStore;
   private providerRegistry: ProviderRegistry;
   private health: Record<string, unknown> = {};
   private abortController: AbortController | undefined;
+  private isRunning = false;
+  private runGeneration = 0;
   private selectedWorkflowId = "manual";
   private safetyMode: SafetyMode = "workspaceWriteWithApproval";
   private contextChips: Record<ContextChipId, boolean> = {
@@ -54,6 +69,13 @@ export class AgentRoomController {
     output: vscode.OutputChannel
   ) {
     this.settings = getAgentRoomSettings();
+    this.operatingModeManager = new OperatingModeManager({
+      workspaceState: this.context.workspaceState,
+      configuredMode: this.settings.operatingMode,
+      requireTypedConfirmationOnSwitch: this.settings.requireTypedConfirmationOnSwitch
+    });
+    this.operatingMode = this.operatingModeManager.currentMode();
+    this.settings.operatingMode = this.operatingMode;
     this.selectedWorkflowId = this.settings.defaultWorkflow;
     this.contextChips = {
       selection: this.settings.includeSelectionByDefault,
@@ -83,6 +105,7 @@ export class AgentRoomController {
   }
 
   async open(): Promise<void> {
+    await this.ensureFirstLaunchMode();
     if (!this.panel) {
       this.panel = new AgentRoomPanel(this.context.extensionUri, (message) =>
         this.handleWebviewMessage(message)
@@ -108,8 +131,53 @@ export class AgentRoomController {
     await this.panel?.post({ type: "healthUpdated", health: this.health });
   }
 
+  async switchOperatingMode(targetMode?: OperatingMode): Promise<void> {
+    const selected = targetMode ?? (await this.pickSwitchMode());
+    if (!selected) return;
+
+    let typedConfirmation: string | undefined;
+    if (
+      this.operatingMode === "workCopilotNative" &&
+      selected === "personalLocal" &&
+      this.operatingModeManager.hasEverBeenInWorkMode() &&
+      this.settings.requireTypedConfirmationOnSwitch
+    ) {
+      typedConfirmation = await vscode.window.showInputBox({
+        title: "Confirm Personal Mode",
+        prompt: `${WORK_TO_PERSONAL_WARNING} Type "${WORK_TO_PERSONAL_CONFIRMATION_TEXT}" to continue.`,
+        ignoreFocusOut: true,
+        validateInput: (value) =>
+          value === WORK_TO_PERSONAL_CONFIRMATION_TEXT
+            ? undefined
+            : `Type "${WORK_TO_PERSONAL_CONFIRMATION_TEXT}" to continue.`
+      });
+      if (typedConfirmation === undefined) return;
+    }
+
+    const result = await this.operatingModeManager.switchMode(selected, {
+      typedConfirmation,
+      cancelActiveProviderSessions: () => this.cancelActiveProviderSessions(),
+      clearRunningState: () => this.clearRunningState(),
+      startTranscriptSegment: async (mode) => {
+        await this.setOperatingMode(mode);
+        await this.startModeTranscriptSegment(mode);
+      },
+      showModeChangedMessage: async (mode) => {
+        await this.addConductorMessage(modeChangedMessage(mode));
+      }
+    });
+
+    if (!result.changed) {
+      if (result.warningText) {
+        await vscode.window.showWarningMessage(result.warningText);
+      }
+      return;
+    }
+    await this.hydrate();
+  }
+
   async resetRoleAssignments(): Promise<void> {
-    this.profile = createDefaultRoomProfile();
+    this.profile = createDefaultRoomProfile(this.operatingMode);
     this.applySettingsToProfile();
     await this.profileStore.save(this.profile);
     await this.hydrate();
@@ -200,8 +268,8 @@ export class AgentRoomController {
         await this.runWorkflow(message.workflowId, message.text);
         return;
       case "stop":
-        this.abortController?.abort();
-        await this.panel?.post({ type: "runningStateChanged", running: false });
+        this.cancelActiveProviderSessions();
+        await this.clearRunningState();
         return;
       case "clearTranscript":
         await this.clearTranscript();
@@ -211,6 +279,9 @@ export class AgentRoomController {
         return;
       case "checkHealth":
         await this.checkCliHealth();
+        return;
+      case "switchOperatingMode":
+        await this.switchOperatingMode(message.mode);
         return;
       case "updateUiState":
         this.updateUiState(message.state);
@@ -290,8 +361,16 @@ export class AgentRoomController {
       await this.addConductorMessage(validation.warnings.join("\n"));
     }
 
+    const workflowGeneration = this.runGeneration;
+    const workflowOperatingMode = this.operatingMode;
     for (const planned of validation.plan.steps) {
-      if (this.abortController?.signal.aborted) break;
+      if (
+        workflowGeneration !== this.runGeneration ||
+        workflowOperatingMode !== this.operatingMode ||
+        this.abortController?.signal.aborted
+      ) {
+        break;
+      }
       if (planned.step.speaker === "conductor") {
         await this.addConductorMessage(new Conductor().summarize(this.currentMessages()), "complete", workflowId, planned.step.id);
         continue;
@@ -338,6 +417,7 @@ export class AgentRoomController {
       participantId: agent.id,
       displayName: agent.displayName,
       providerId: agent.providerId,
+      operatingMode: this.operatingMode,
       roleIds: roles.map((role) => role.id),
       roleNames: roles.map((role) => role.name),
       workflowId: options.workflowId,
@@ -347,7 +427,11 @@ export class AgentRoomController {
     });
     await this.hydrate();
 
-    this.abortController = new AbortController();
+    const runAbortController = new AbortController();
+    const runGeneration = this.runGeneration;
+    const runOperatingMode = this.operatingMode;
+    this.abortController = runAbortController;
+    this.isRunning = true;
     await this.panel?.post({ type: "runningStateChanged", running: true });
     const safety = new SafetyPolicy({
       enableDangerousModes: this.settings.enableDangerousModes,
@@ -373,21 +457,46 @@ export class AgentRoomController {
         safetyInstruction: safety.instructionFor(this.safetyMode),
         timeoutMs: this.settings.agentTimeoutSeconds * 1000,
         maxPromptChars: this.settings.maxPromptChars,
-        abortSignal: this.abortController.signal
+        abortSignal: runAbortController.signal
       });
+      if (
+        runGeneration !== this.runGeneration ||
+        runOperatingMode !== this.operatingMode ||
+        runAbortController.signal.aborted
+      ) {
+        await this.transcriptStore.updateMessage(transcript.id, pending.id, {
+          status: "cancelled",
+          content: "Cancelled because the operating mode changed or the run was stopped."
+        });
+        return;
+      }
       await this.transcriptStore.updateMessage(transcript.id, pending.id, {
         status: messageStatusFromProvider(result.status),
         content: result.finalText,
         diagnostics: result.diagnostics
       });
     } catch (error) {
+      if (
+        runGeneration !== this.runGeneration ||
+        runOperatingMode !== this.operatingMode ||
+        runAbortController.signal.aborted
+      ) {
+        await this.transcriptStore.updateMessage(transcript.id, pending.id, {
+          status: "cancelled",
+          content: "Cancelled because the operating mode changed or the run was stopped."
+        });
+        return;
+      }
       await this.transcriptStore.updateMessage(transcript.id, pending.id, {
         status: "error",
         content: error instanceof Error ? error.message : String(error)
       });
     } finally {
-      this.abortController = undefined;
-      await this.panel?.post({ type: "runningStateChanged", running: false });
+      if (this.abortController === runAbortController) {
+        this.abortController = undefined;
+        this.isRunning = false;
+        await this.panel?.post({ type: "runningStateChanged", running: false });
+      }
     }
   }
 
@@ -396,6 +505,7 @@ export class AgentRoomController {
     if (current) return current;
     const context = await this.collectContext();
     return this.transcriptStore.create({
+      operatingMode: this.operatingMode,
       workspacePath: context.workspacePath,
       workspaceName: context.workspaceName,
       gitBranch: context.gitBranch,
@@ -412,6 +522,7 @@ export class AgentRoomController {
       participantId: "user",
       displayName: "User",
       providerId: "human",
+      operatingMode: this.operatingMode,
       roleIds: ["productOwner", "finalApprover"],
       roleNames: ["Product Owner", "Final Approver"],
       status: "complete",
@@ -432,6 +543,7 @@ export class AgentRoomController {
       participantId: "conductor",
       displayName: "Conductor",
       providerId: "internalConductor",
+      operatingMode: this.operatingMode,
       roleIds: ["moderator", "workflowCoordinator", "modelAdvisor"],
       roleNames: ["Moderator", "Workflow Coordinator", "Model Advisor"],
       workflowId,
@@ -447,16 +559,92 @@ export class AgentRoomController {
       profile: this.profile,
       transcript: this.transcriptStore.current(),
       settings: this.settings,
+      operatingMode: this.operatingMode,
+      operatingModeTitle: modeTitle(this.operatingMode),
+      operatingModeDescription: modeDescription(this.operatingMode),
       health: this.health,
       selectedWorkflowId: this.selectedWorkflowId,
       safetyMode: this.safetyMode,
+      running: this.isRunning,
       contextChips: this.contextChips
     });
+  }
+
+  private async ensureFirstLaunchMode(): Promise<void> {
+    if (!this.settings.firstLaunchShowModePicker || this.operatingModeManager.firstLaunchComplete()) {
+      return;
+    }
+
+    const selected = await this.pickFirstLaunchMode();
+    if (!selected) return;
+    await this.operatingModeManager.initializeMode(selected);
+    await this.setOperatingMode(selected);
+  }
+
+  private async pickFirstLaunchMode(): Promise<OperatingMode | undefined> {
+    while (true) {
+      const picked = await vscode.window.showQuickPick(FIRST_LAUNCH_MODE_PICKER_ITEMS, {
+        title: "Choose Agent Room mode for this workspace",
+        placeHolder:
+          "Work Mode and Personal Mode are fully separated. Mode can be changed later only through Agent Room: Switch Operating Mode.",
+        ignoreFocusOut: true
+      });
+      if (!picked) return undefined;
+      if (picked.learnMore) {
+        await vscode.window.showInformationMessage(
+          "Agent Room has no Hybrid Mode. Work Mode and Personal Mode are fully separated, and mode can be changed later only through Agent Room: Switch Operating Mode."
+        );
+        continue;
+      }
+      return picked.mode;
+    }
+  }
+
+  private async pickSwitchMode(): Promise<OperatingMode | undefined> {
+    const picked = await vscode.window.showQuickPick(SWITCH_MODE_PICKER_ITEMS, {
+      title: "Agent Room: Switch Operating Mode",
+      placeHolder: "Choose Work / Copilot Native or Personal / Local CLI.",
+      ignoreFocusOut: true
+    });
+    return picked?.mode;
+  }
+
+  private async setOperatingMode(mode: OperatingMode): Promise<void> {
+    this.operatingMode = mode;
+    this.settings.operatingMode = mode;
+    this.profileStore = this.createProfileStore();
+    this.profile = await this.profileStore.load();
+    this.applySettingsToProfile();
+  }
+
+  private async startModeTranscriptSegment(mode: OperatingMode): Promise<void> {
+    const context = await this.collectContext();
+    await this.transcriptStore.create({
+      operatingMode: mode,
+      workspacePath: context.workspacePath,
+      workspaceName: context.workspaceName,
+      gitBranch: context.gitBranch,
+      roomProfileSnapshot: this.profile,
+      workflowId: this.selectedWorkflowId,
+      settingsSnapshot: this.settings as unknown as Record<string, unknown>
+    });
+  }
+
+  private cancelActiveProviderSessions(): void {
+    this.runGeneration += 1;
+    this.abortController?.abort();
+    this.abortController = undefined;
+  }
+
+  private async clearRunningState(): Promise<void> {
+    this.isRunning = false;
+    await this.panel?.post({ type: "runningStateChanged", running: false });
   }
 
   private createProfileStore(): RoomProfileStore {
     return new RoomProfileStore({
       mode: this.settings.roomProfileStorage,
+      operatingMode: this.operatingMode,
       workspaceRoot: this.workspaceRoot(),
       globalStore: this.context.globalState
     });

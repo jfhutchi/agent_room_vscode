@@ -94,6 +94,9 @@ export class TranscriptStore {
       operatingMode: input.operatingMode,
       roleIds: input.roleIds,
       roleNames: input.roleNames,
+      modelTier: input.modelTier,
+      concreteModelName: input.concreteModelName,
+      effortLevel: input.effortLevel,
       workflowId: input.workflowId,
       workflowStepId: input.workflowStepId,
       status: input.status,
@@ -159,6 +162,20 @@ export class TranscriptStore {
 
     for (const message of transcript.messages) {
       lines.push("", mdHeading(2, message.displayName));
+      // §14: mode, provider, model, effort, and roles travel with the message.
+      const meta = [
+        message.operatingMode === "workCopilotNative"
+          ? "Work Mode"
+          : message.operatingMode === "personalLocal"
+            ? "Personal Mode"
+            : undefined,
+        message.providerId && message.providerId !== "human" ? message.providerId : undefined,
+        message.concreteModelName ??
+          (message.modelTier && message.modelTier !== "providerDefault" ? message.modelTier : undefined),
+        message.effortLevel ? `effort: ${message.effortLevel}` : undefined,
+        message.createdAt
+      ].filter(Boolean);
+      if (meta.length) lines.push(meta.join(" · "), "");
       if (message.roleNames.length) lines.push(`Roles: ${message.roleNames.join(", ")}`, "");
       lines.push(message.content || `(${message.status})`);
       if (includeDiagnostics && message.diagnostics) {

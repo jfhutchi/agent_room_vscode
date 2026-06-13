@@ -48,6 +48,57 @@ test("transcript store creates, appends, serializes, and exports markdown", asyn
   }
 });
 
+test("messages record mode, provider, model, effort, and roles; exports include them (§14)", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "agent-room-"));
+  try {
+    const store = new TranscriptStore({ mode: "workspace", workspaceRoot: workspace });
+    const transcript = await store.create({
+      operatingMode: "personalLocal",
+      workspacePath: workspace,
+      workspaceName: "agent-room",
+      roomProfileSnapshot: createDefaultRoomProfile(),
+      workflowId: "planReview",
+      settingsSnapshot: {}
+    });
+
+    await store.appendMessage(transcript.id, {
+      participantKind: "virtualAgent",
+      participantId: "atlas",
+      displayName: "Atlas",
+      providerId: "claudeCodeCli",
+      operatingMode: "personalLocal",
+      roleIds: [ROLE_IDS.planner],
+      roleNames: ["Planner"],
+      modelTier: "deepReasoning",
+      concreteModelName: "opus",
+      effortLevel: "high",
+      workflowId: "planReview",
+      status: "complete",
+      content: "Plan ready."
+    });
+
+    const stored = store.current()?.messages[0];
+    assert.equal(stored?.operatingMode, "personalLocal");
+    assert.equal(stored?.providerId, "claudeCodeCli");
+    assert.equal(stored?.modelTier, "deepReasoning");
+    assert.equal(stored?.concreteModelName, "opus");
+    assert.equal(stored?.effortLevel, "high");
+    assert.deepEqual(stored?.roleNames, ["Planner"]);
+
+    const markdown = store.exportMarkdown(transcript.id);
+    assert.match(markdown, /Personal Mode · claudeCodeCli · opus · effort: high/);
+    assert.match(markdown, /Roles: Planner/);
+
+    const json = JSON.parse(store.exportJson(transcript.id)) as {
+      messages: Array<Record<string, unknown>>;
+    };
+    assert.equal(json.messages[0].concreteModelName, "opus");
+    assert.equal(json.messages[0].effortLevel, "high");
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("transcript store creates distinct mode-tagged transcript segments", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "agent-room-"));
   try {

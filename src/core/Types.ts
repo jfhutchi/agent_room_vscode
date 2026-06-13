@@ -167,6 +167,12 @@ export interface AgentRoomMessage {
   operatingMode?: OperatingMode;
   roleIds: RoleId[];
   roleNames: string[];
+  /** Model tier the turn ran under (SPEC §14). */
+  modelTier?: ModelTier;
+  /** Concrete model name when one was resolved; undefined = provider default. */
+  concreteModelName?: string;
+  /** Advisory effort level for the turn (SPEC §14). */
+  effortLevel?: EffortLevel;
   workflowId?: WorkflowId;
   workflowStepId?: string;
   createdAt: string;

@@ -696,6 +696,13 @@ export class AgentRoomController {
       return;
     }
     const roles = this.rolesForAgent(agent);
+    const modelTier = agent.preferredModelTier ?? "providerDefault";
+    const concreteModelName = resolveConcreteModel(
+      this.settings.models,
+      this.requireOperatingMode(),
+      agent.providerId,
+      modelTier
+    );
     const pending = await this.transcriptStore.appendMessage(transcript.id, {
       participantKind: "virtualAgent",
       participantId: agent.id,
@@ -704,6 +711,9 @@ export class AgentRoomController {
       operatingMode: this.operatingMode,
       roleIds: roles.map((role) => role.id),
       roleNames: roles.map((role) => role.name),
+      modelTier,
+      concreteModelName,
+      effortLevel: agent.effortLevel,
       workflowId: options.workflowId,
       workflowStepId: options.stepId,
       status: "running",
@@ -746,12 +756,7 @@ export class AgentRoomController {
         safetyInstruction: safety.instructionFor(this.safetyMode),
         operatingMode,
         effortLevel: agent.effortLevel,
-        concreteModelName: resolveConcreteModel(
-          this.settings.models,
-          operatingMode,
-          agent.providerId,
-          agent.preferredModelTier ?? "providerDefault"
-        ),
+        concreteModelName,
         timeoutMs: this.settings.agentTimeoutSeconds * 1000,
         maxPromptChars: this.settings.maxPromptChars,
         abortSignal: runAbortController.signal

@@ -13,7 +13,9 @@
     contextChips: { selection: true, currentFile: false, gitStatus: true },
     setupOpen: false,
     latestRecommendation: null,
-    copilotCapabilities: null
+    copilotCapabilities: null,
+    showDiagnostics: false,
+    replyTo: null
   };
 
   const el = {
@@ -36,7 +38,13 @@
     copilotPanel: document.getElementById("copilotPanel"),
     copilotCapabilities: document.getElementById("copilotCapabilities"),
     copilotLimitations: document.getElementById("copilotLimitations"),
-    copilotCheckButton: document.getElementById("copilotCheckButton")
+    copilotCheckButton: document.getElementById("copilotCheckButton"),
+    gitBranch: document.getElementById("gitBranch"),
+    typingIndicator: document.getElementById("typingIndicator"),
+    diagnosticsButton: document.getElementById("diagnosticsButton"),
+    replyChip: document.getElementById("replyChip"),
+    replyChipText: document.getElementById("replyChipText"),
+    replyChipCancel: document.getElementById("replyChipCancel")
   };
 
   function post(message) {
@@ -223,19 +231,26 @@
       const name = document.createElement("div");
       name.className = "message-name";
       name.textContent = text(message.displayName);
-      const roles = document.createElement("div");
-      roles.className = "message-meta";
-      roles.textContent = (message.roleNames || []).join(", ");
+      const badges = document.createElement("div");
+      badges.className = "message-meta";
+      const badgeParts = [];
+      if (message.providerId && message.providerId !== "human") {
+        badgeParts.push(providerName(message.providerId));
+      }
+      if ((message.roleNames || []).length) badgeParts.push(message.roleNames.join(", "));
+      badges.textContent = badgeParts.join(" · ");
       const status = document.createElement("div");
       status.className = "message-meta";
-      status.textContent = text(message.status);
-      meta.append(name, roles, status);
+      const stamp = message.createdAt ? new Date(message.createdAt) : null;
+      const time = stamp && !Number.isNaN(stamp.getTime()) ? stamp.toLocaleTimeString() : "";
+      status.textContent = [text(message.status), time].filter(Boolean).join(" · ");
+      meta.append(name, badges, status);
       const body = document.createElement("div");
       const content = document.createElement("div");
       content.className = "message-content";
       content.textContent = message.content || (message.status === "running" ? "Running..." : "");
       body.appendChild(content);
-      if (message.diagnostics) {
+      if (message.diagnostics && state.showDiagnostics) {
         const details = document.createElement("details");
         const summary = document.createElement("summary");
         summary.textContent = "Diagnostics";
@@ -244,10 +259,38 @@
         details.append(summary, pre);
         body.appendChild(details);
       }
+      const actions = document.createElement("div");
+      actions.className = "message-actions";
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = "Copy";
+      copy.addEventListener("click", () => {
+        navigator.clipboard?.writeText(message.content || "");
+      });
+      const reply = document.createElement("button");
+      reply.type = "button";
+      reply.textContent = "Reply";
+      reply.addEventListener("click", () => {
+        state.replyTo = { id: message.id, name: message.displayName };
+        renderReplyChip();
+        el.text.focus();
+      });
+      actions.append(copy, reply);
+      body.appendChild(actions);
       article.append(meta, body);
       el.transcript.appendChild(article);
     }
     el.transcript.scrollTop = el.transcript.scrollHeight;
+  }
+
+  function renderReplyChip() {
+    if (state.replyTo) {
+      el.replyChipText.textContent = `Replying to ${state.replyTo.name}`;
+      el.replyChip.classList.remove("hidden");
+    } else {
+      el.replyChipText.textContent = "";
+      el.replyChip.classList.add("hidden");
+    }
   }
 
   function renderAdvisor(recommendation) {
@@ -280,6 +323,7 @@
 
   function renderAll() {
     if (state.transcript?.workspaceName) el.workspaceName.textContent = state.transcript.workspaceName;
+    el.gitBranch.textContent = state.transcript?.gitBranch ? `⎇ ${state.transcript.gitBranch}` : "";
     renderMode();
     renderHealth();
     renderWorkflows();
@@ -287,6 +331,7 @@
     renderRoleMatrix();
     renderTranscript();
     renderCopilotCapabilities();
+    renderReplyChip();
   }
 
   window.addEventListener("message", (event) => {
@@ -313,6 +358,15 @@
     if (message.type === "healthUpdated") {
       state.health = message.health || {};
       renderHealth();
+    }
+    if (message.type === "runningStateChanged") {
+      if (message.running && message.activity) {
+        el.typingIndicator.textContent = message.activity;
+        el.typingIndicator.classList.remove("hidden");
+      } else {
+        el.typingIndicator.textContent = "";
+        el.typingIndicator.classList.add("hidden");
+      }
     }
     if (message.type === "copilotCapabilitiesUpdated") {
       state.copilotCapabilities = message.capabilities || null;
@@ -345,8 +399,22 @@
   el.safety.addEventListener("change", () =>
     post({ type: "updateUiState", state: { safetyMode: el.safety.value } })
   );
+  el.diagnosticsButton.addEventListener("click", () => {
+    state.showDiagnostics = !state.showDiagnostics;
+    el.diagnosticsButton.setAttribute("aria-pressed", String(state.showDiagnostics));
+    renderTranscript();
+  });
+  el.replyChipCancel.addEventListener("click", () => {
+    state.replyTo = null;
+    renderReplyChip();
+  });
   document.getElementById("sendButton").addEventListener("click", () => {
-    if (el.text.value.trim()) post({ type: "sendMessage", text: el.text.value });
+    if (!el.text.value.trim()) return;
+    const payload = { type: "sendMessage", text: el.text.value };
+    if (state.replyTo) payload.replyToMessageId = state.replyTo.id;
+    post(payload);
+    state.replyTo = null;
+    renderReplyChip();
   });
   document.getElementById("runWorkflowButton").addEventListener("click", () => {
     if (el.text.value.trim()) post({ type: "runWorkflow", workflowId: el.workflow.value, text: el.text.value });

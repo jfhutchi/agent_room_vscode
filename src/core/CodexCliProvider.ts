@@ -9,6 +9,8 @@ import {
 import { eventType, extractTextFromEvent, parseJsonLines } from "../utils/jsonl";
 import { redactDeep, redactText } from "../utils/redaction";
 import { resultDiagnostics, runCommand } from "../utils/childProcess";
+import { SafetyPolicy } from "./SafetyPolicy";
+import { SafetyMode } from "./Types";
 
 export interface CodexCliProviderOptions {
   executable: string;
@@ -16,6 +18,76 @@ export interface CodexCliProviderOptions {
   useJson: boolean;
   sandbox: "read-only" | "workspace-write";
   approval: "untrusted" | "on-request" | "never";
+}
+
+/** Canonical §12 friendly string. */
+export const CODEX_NOT_AVAILABLE_MESSAGE =
+  "Codex is not available. Run `codex` once in a terminal to finish setup.";
+
+export interface BuiltCodexArgs {
+  args: string[];
+  /** True when --json made it into the args, so output is parsed as JSONL. */
+  json: boolean;
+  warnings: string[];
+}
+
+/**
+ * Degradation ladder (SPEC §8). Preferred shape:
+ *   codex exec --cd <root> --sandbox <mode> --ask-for-approval <policy> --json -
+ * Unsupported flags (per `codex --help` capabilities) are omitted: without
+ * --cd the runner's cwd carries the workspace; without --json the plain text
+ * output is parsed instead. With no capability information yet, the full
+ * preferred shape is used. The sandbox value is resolved through SafetyPolicy
+ * so a read-only safety mode always yields a read-only sandbox.
+ */
+export function buildCodexArgs(
+  options: Pick<CodexCliProviderOptions, "useJson" | "sandbox" | "approval">,
+  capabilities: ProviderCapabilities | undefined,
+  invocation: { workspaceRoot?: string; concreteModelName?: string; safetyMode: SafetyMode }
+): BuiltCodexArgs {
+  const supports = (flag: boolean | undefined) => !capabilities || flag === true;
+  const args: string[] = [];
+  const warnings: string[] = [];
+
+  if (supports(capabilities?.exec)) {
+    args.push("exec");
+  } else {
+    warnings.push("This Codex CLI does not list an `exec` subcommand; invoking it directly.");
+  }
+  if (invocation.workspaceRoot && supports(capabilities?.cd)) {
+    args.push("--cd", invocation.workspaceRoot);
+  }
+  const safety = new SafetyPolicy({
+    enableDangerousModes: false,
+    dangerousModeSelected: false,
+    dangerousModeConfirmed: false
+  });
+  if (supports(capabilities?.sandbox)) {
+    args.push("--sandbox", safety.codexSandboxFor(invocation.safetyMode, options.sandbox));
+  }
+  if (supports(capabilities?.askForApproval)) {
+    args.push("--ask-for-approval", options.approval);
+  }
+  let json = false;
+  if (options.useJson) {
+    if (supports(capabilities?.jsonl)) {
+      args.push("--json");
+      json = true;
+    } else {
+      warnings.push("--json is not supported by this Codex CLI; parsing plain text output.");
+    }
+  }
+  if (invocation.concreteModelName) {
+    if (supports(capabilities?.model)) {
+      args.push("--model", invocation.concreteModelName);
+    } else {
+      warnings.push(
+        `This Codex CLI does not expose a --model flag; using the provider default instead of "${invocation.concreteModelName}".`
+      );
+    }
+  }
+  args.push("-");
+  return { args, json, warnings };
 }
 
 export interface ParsedCodexOutput {
@@ -80,7 +152,14 @@ export class CodexCliProvider implements Provider {
   readonly enabled = true;
   readonly supportedModes = ["personalLocal"] as const;
 
+  /** Capabilities detected by the last health check; consulted by runTurn. */
+  private capabilities: ProviderCapabilities | undefined;
+
   constructor(private readonly options: CodexCliProviderOptions) {}
+
+  cachedCapabilities(): ProviderCapabilities | undefined {
+    return this.capabilities;
+  }
 
   async healthCheck(): Promise<ProviderHealth> {
     const version = await runCommand({
@@ -96,18 +175,18 @@ export class CodexCliProvider implements Provider {
       label: "codex --help"
     });
     const combined = `${version.stdout}\n${version.stderr}\n${help.stdout}\n${help.stderr}`;
+    this.capabilities = codexCapabilities(help.stdout || help.stderr);
+    const available = !version.failedToStart && (version.exitCode === 0 || help.exitCode === 0);
     return {
       providerId: this.id,
-      available: !version.failedToStart && (version.exitCode === 0 || help.exitCode === 0),
-      configured: !version.failedToStart,
+      available,
+      configured: available,
       authenticatedLikely: authLikely(combined),
       executable: this.options.executable,
       versionText: redactText(version.stdout || version.stderr).trim(),
       helpText: redactText(help.stdout || help.stderr).slice(0, 8000),
-      capabilities: codexCapabilities(help.stdout || help.stderr),
-      warnings: version.failedToStart
-        ? ["Codex CLI was not found. Run `codex` in a terminal and complete installation/login."]
-        : [],
+      capabilities: this.capabilities,
+      warnings: available ? [] : [CODEX_NOT_AVAILABLE_MESSAGE],
       error: version.failedToStart ? version.errorMessage : undefined,
       checkedAt: new Date().toISOString()
     };
@@ -115,12 +194,32 @@ export class CodexCliProvider implements Provider {
 
   async runTurn(invocation: ProviderInvocation): Promise<ProviderResult> {
     const started = Date.now();
-    const args = ["exec"];
-    if (invocation.workspaceRoot) args.push("--cd", invocation.workspaceRoot);
-    args.push("--sandbox", this.options.sandbox, "--ask-for-approval", this.options.approval);
-    if (this.options.useJson) args.push("--json");
-    if (invocation.concreteModelName) args.push("--model", invocation.concreteModelName);
-    args.push("-");
+    const built = buildCodexArgs(this.options, this.capabilities, {
+      workspaceRoot: invocation.workspaceRoot,
+      concreteModelName: invocation.concreteModelName,
+      safetyMode: invocation.safetyMode
+    });
+    const { args } = built;
+
+    // SPEC §17: dangerous flags never reach the CLI without every gate open.
+    const safety = new SafetyPolicy({
+      enableDangerousModes: false,
+      dangerousModeSelected: false,
+      dangerousModeConfirmed: false
+    });
+    const decision = safety.checkArgs(args, invocation.safetyMode);
+    if (!decision.allowed) {
+      return {
+        providerId: this.id,
+        virtualAgentId: invocation.virtualAgentId,
+        status: "error",
+        finalText: decision.reason ?? "Blocked by safety policy.",
+        diagnostics: { warnings: built.warnings },
+        durationMs: Date.now() - started,
+        fallbackUsed: false,
+        warnings: built.warnings
+      };
+    }
 
     const result = await runCommand({
       executable: this.options.executable,
@@ -132,12 +231,13 @@ export class CodexCliProvider implements Provider {
       label: "codex",
       onStdout: invocation.onPartialText
     });
-    const parsed = parseCodexOutput(result.stdout, this.options.useJson);
+    const parsed = parseCodexOutput(result.stdout, built.json);
+    const warnings = [...built.warnings, ...parsed.warnings];
     const diagnostics: AgentDiagnostics = {
       ...resultDiagnostics(result),
       rawEvents: parsed.events,
       fallbackUsed: parsed.fallbackUsed,
-      warnings: parsed.warnings,
+      warnings,
       error: result.errorMessage
     };
 
@@ -145,11 +245,17 @@ export class CodexCliProvider implements Provider {
       providerId: this.id,
       virtualAgentId: invocation.virtualAgentId,
       status: result.cancelled ? "cancelled" : result.timedOut ? "timeout" : result.exitCode === 0 ? "complete" : "error",
-      finalText: parsed.text || redactText(result.stderr || result.errorMessage || "Codex CLI produced no output."),
+      finalText:
+        parsed.text ||
+        redactText(
+          result.stderr ||
+            result.errorMessage ||
+            (result.failedToStart ? CODEX_NOT_AVAILABLE_MESSAGE : "Codex CLI produced no output.")
+        ),
       diagnostics,
       durationMs: Date.now() - started,
       fallbackUsed: parsed.fallbackUsed,
-      warnings: parsed.warnings
+      warnings
     };
   }
 }

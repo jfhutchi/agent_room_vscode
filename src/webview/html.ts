@@ -29,6 +29,7 @@ export function getAgentRoomHtml(webview: vscode.Webview, extensionUri: vscode.U
       <div>
         <div class="eyebrow">Agent Room</div>
         <h1 id="workspaceName">Workspace</h1>
+        <div id="gitBranch" class="git-branch" aria-label="Git branch"></div>
       </div>
       <div class="mode-badge" aria-label="Operating mode">
         <div id="modeTitle">Agent Room — Personal Mode</div>
@@ -36,6 +37,7 @@ export function getAgentRoomHtml(webview: vscode.Webview, extensionUri: vscode.U
       </div>
       <div class="header-actions">
         <button id="healthButton" type="button">Check Health</button>
+        <button id="diagnosticsButton" type="button" aria-pressed="false">Diagnostics</button>
         <button id="setupButton" type="button" aria-expanded="false">Room Setup</button>
       </div>
     </header>
@@ -87,8 +89,13 @@ export function getAgentRoomHtml(webview: vscode.Webview, extensionUri: vscode.U
     </section>
 
     <section id="transcript" class="transcript" aria-live="polite"></section>
+    <div id="typingIndicator" class="typing-indicator hidden" aria-live="polite"></div>
 
     <footer class="composer">
+      <div id="replyChip" class="reply-chip hidden">
+        <span id="replyChipText"></span>
+        <button id="replyChipCancel" type="button" aria-label="Cancel reply">×</button>
+      </div>
       <div class="context-row">
         <label><input id="chipSelection" type="checkbox" checked> Selection</label>
         <label><input id="chipGitStatus" type="checkbox" checked> Git</label>

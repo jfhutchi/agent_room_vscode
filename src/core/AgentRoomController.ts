@@ -25,7 +25,7 @@ import { providerHealthSummary } from "./ProviderHealth";
 import type { ChatParticipantStatus } from "./ChatParticipant";
 import type { ProviderHealth as ProviderHealthInfo } from "./ProviderTypes";
 import { CodexCliProvider } from "./CodexCliProvider";
-import { Conductor } from "./Conductor";
+import { Conductor, typingIndicatorFor } from "./Conductor";
 import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
 import { ProviderRegistry } from "./ProviderRegistry";
 import { RoleRegistry } from "./RoleRegistry";
@@ -681,7 +681,11 @@ export class AgentRoomController {
     const runOperatingMode = this.operatingMode;
     this.abortController = runAbortController;
     this.isRunning = true;
-    await this.panel?.post({ type: "runningStateChanged", running: true });
+    await this.panel?.post({
+      type: "runningStateChanged",
+      running: true,
+      activity: typingIndicatorFor(agent.displayName, agent.assignedRoleIds)
+    });
     const safety = new SafetyPolicy({
       enableDangerousModes: this.settings.enableDangerousModes,
       dangerousModeSelected: this.safetyMode === "dangerous",

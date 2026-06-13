@@ -658,14 +658,20 @@
     post(payload);
     state.replyTo = null;
     renderReplyChip();
+    el.text.value = "";
+    el.text.focus();
   });
   document.getElementById("startBuildButton").addEventListener("click", () => {
     if (!el.text.value.trim()) return;
     post({ type: "startOrchestratedBuild", text: el.text.value });
     el.text.value = "";
+    el.text.focus();
   });
   document.getElementById("runWorkflowButton").addEventListener("click", () => {
-    if (el.text.value.trim()) post({ type: "runWorkflow", workflowId: el.workflow.value, text: el.text.value });
+    if (!el.text.value.trim()) return;
+    post({ type: "runWorkflow", workflowId: el.workflow.value, text: el.text.value });
+    el.text.value = "";
+    el.text.focus();
   });
   document.getElementById("stopButton").addEventListener("click", () => post({ type: "stop" }));
   document.getElementById("clearButton").addEventListener("click", () => post({ type: "clearTranscript" }));

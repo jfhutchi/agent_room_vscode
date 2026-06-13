@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4 — 2026-06-13
+
+- **Send honors the selected workflow.** With a workflow like Roundtable selected, Send
+  now runs that workflow (the whole team responds) instead of replying with a single
+  agent. A plain "Manual" selection still gets a single-agent reply.
+- **Health check runs on launch.** Opening the room now auto-runs the CLI health check,
+  so the provider status chips populate without clicking "Check Health."
+
 ## 0.2.3 — 2026-06-13
 
 - **Clean agent replies even with Claude Code hooks.** The Claude stream-json parser

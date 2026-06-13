@@ -194,6 +194,7 @@ export class AgentRoomController {
   async open(): Promise<boolean> {
     const modeSelected = await this.ensureFirstLaunchMode();
     if (!modeSelected) return false;
+    let freshlyOpened = false;
     if (!this.panel) {
       this.panel = new AgentRoomPanel(this.context.extensionUri, (message) =>
         this.handleWebviewMessage(message)
@@ -201,11 +202,17 @@ export class AgentRoomController {
       this.panel.onDidDispose(() => {
         this.panel = undefined;
       });
+      freshlyOpened = true;
     } else {
       this.panel.reveal();
     }
     await this.ensureTranscript();
     await this.hydrate();
+    if (freshlyOpened) {
+      // Auto-run the CLI health check on launch so the status chips populate
+      // without a manual click.
+      void this.runHealthCheck().catch(() => undefined);
+    }
     return true;
   }
 
@@ -216,6 +223,10 @@ export class AgentRoomController {
 
   async checkCliHealth(): Promise<void> {
     if (!(await this.open())) return;
+    await this.runHealthCheck();
+  }
+
+  private async runHealthCheck(): Promise<void> {
     this.health = await checkProviderHealth(this.requireProviderRegistry());
     await this.panel?.post({ type: "healthUpdated", health: this.health });
   }
@@ -897,10 +908,14 @@ export class AgentRoomController {
         return;
       }
     }
-    // A plain message gets an actual reply from a team member, so the room
-    // responds. (Run Workflow runs the selected workflow; Start Build is the
-    // autonomous orchestration.)
-    await this.respondWithDefaultAgent(text);
+    // Respond using the selected workflow, so "Roundtable" (etc.) engages the
+    // whole team on Send. A plain "Manual" selection gets a single-agent reply.
+    const selected = new WorkflowRegistry(this.requireProfile().workflows).get(this.selectedWorkflowId);
+    if (selected && selected.steps.length > 0) {
+      await this.runWorkflow(this.selectedWorkflowId, text, false);
+    } else {
+      await this.respondWithDefaultAgent(text);
+    }
     await this.hydrate();
   }
 

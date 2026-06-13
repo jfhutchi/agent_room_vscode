@@ -32,9 +32,10 @@ import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
 import { ProviderRegistry } from "./ProviderRegistry";
 import { RoleRegistry, ROLE_IDS } from "./RoleRegistry";
 import {
+  ADVERSARY_VERDICT_INSTRUCTION,
   CRITIC_VERDICT_INSTRUCTION,
   PROPOSER_VERDICT_INSTRUCTION,
-  runDebate,
+  runOrchestration,
   type DebateEntry,
   type DebateRole
 } from "./Orchestrator";
@@ -696,6 +697,11 @@ export class AgentRoomController {
       await this.addConductorMessage("Lost the Planner or Reviewer assignment; cannot run the debate.", "error");
       return;
     }
+    // Stage 2: a third agent red-teams the agreed plan. Prefer a Security Auditor
+    // distinct from the critic; fall back to any security/quality auditor, then the critic.
+    const auditors = team.agentsWithAnyRole([ROLE_IDS.securityAuditor, ROLE_IDS.codeQualityAuditor]);
+    const adversary = auditors.find((agent) => agent.id !== critic.id) ?? auditors[0] ?? critic;
+
     const registry = this.requireProviderRegistry();
     const operatingMode = this.requireOperatingMode();
     const runAbort = new AbortController();
@@ -707,20 +713,22 @@ export class AgentRoomController {
       dangerousModeSelected: this.safetyMode === "dangerous",
       dangerousModeConfirmed: false
     });
-    const agentFor = (role: DebateRole): VirtualAgent => (role === "proposer" ? proposer : critic);
+    const agentFor = (role: DebateRole): VirtualAgent =>
+      role === "proposer" ? proposer : role === "adversary" ? adversary : critic;
     const concreteFor = (agent: VirtualAgent): string | undefined =>
       resolveConcreteModel(this.settings.models, operatingMode, agent.providerId, agent.preferredModelTier ?? "providerDefault");
 
     try {
       await this.addConductorMessage(
-        `Starting the plan debate: ${proposer.displayName} proposes, ${critic.displayName} reviews — up to ${this.settings.orchestration.maxDebateRounds} rounds until they agree.`
+        `Starting the orchestrated build: ${proposer.displayName} proposes, ${critic.displayName} reviews to consensus, then ${adversary.displayName} red-teams the plan — up to ${this.settings.orchestration.maxAdversarialCycles} adversarial cycle(s).`
       );
       await this.hydrate();
 
-      const outcome = await runDebate({
+      const outcome = await runOrchestration({
         maxRounds: this.settings.orchestration.maxDebateRounds,
+        maxCycles: this.settings.orchestration.maxAdversarialCycles,
         signal: runAbort.signal,
-        runTurn: async ({ role, round, history }) => {
+        runTurn: async ({ role, round, cycle, history }) => {
           const agent = agentFor(role);
           const provider = profile.providers.find((entry) => entry.id === agent.providerId);
           if (!provider || !registry.has(agent.providerId)) {
@@ -738,10 +746,15 @@ export class AgentRoomController {
             roles: this.rolesForAgent(agent),
             participants: this.participants(),
             transcript: this.currentMessages(),
-            latestUserMessage: this.buildDebatePrompt(goal, intakeAnswers, role, round, history),
+            latestUserMessage: this.buildDebatePrompt(goal, intakeAnswers, role, round, cycle, history),
             context: await this.collectContext(),
             workflowName: "Orchestrated Build",
-            stepName: role === "proposer" ? `Plan (round ${round})` : `Review (round ${round})`,
+            stepName:
+              role === "proposer"
+                ? `Plan (cycle ${cycle}, round ${round})`
+                : role === "adversary"
+                  ? `Red-team (cycle ${cycle})`
+                  : `Review (cycle ${cycle}, round ${round})`,
             safetyMode: this.safetyMode,
             safetyInstruction: safety.instructionFor(this.safetyMode),
             operatingMode,
@@ -763,8 +776,8 @@ export class AgentRoomController {
             displayName: agent.displayName,
             providerId: agent.providerId,
             operatingMode,
-            roleIds: roles.map((role) => role.id),
-            roleNames: roles.map((role) => role.name),
+            roleIds: roles.map((r) => r.id),
+            roleNames: roles.map((r) => r.name),
             modelTier: agent.preferredModelTier ?? "providerDefault",
             concreteModelName: concreteFor(agent),
             effortLevel: agent.effortLevel,
@@ -779,19 +792,25 @@ export class AgentRoomController {
         await this.addConductorMessage("Orchestrated build stopped.");
         return;
       }
-      if (outcome.status === "consensus") {
+      if (outcome.status === "approved") {
         this.orchestration = { phase: "awaitingApproval", goal };
         await this.addConductorMessage(
-          `Consensus reached after ${outcome.rounds} round(s).\n\nAgreed plan: ${
+          `Plan agreed and it survived ${adversary.displayName}'s adversarial review (cycle ${outcome.cycles}).\n\nAgreed plan: ${
             outcome.planSummary ?? "see the discussion above"
           }\n\nApprove to continue, or reply with changes.`
         );
         await vscode.window.showInformationMessage(
-          `Agent Room: the team agreed on a plan${outcome.planSummary ? ` — ${outcome.planSummary}` : ""}. Approve in the room to continue.`
+          `Agent Room: the team agreed on a plan that passed adversarial review${
+            outcome.planSummary ? ` — ${outcome.planSummary}` : ""
+          }. Approve in the room to continue.`
         );
-      } else if (outcome.status === "cap") {
+      } else if (outcome.status === "noConsensus") {
         await this.addConductorMessage(
-          `No consensus after ${outcome.rounds} rounds. ${proposer.displayName} and ${critic.displayName} still disagree — review the discussion above and decide how to proceed.`
+          `No consensus in the debate (cycle ${outcome.cycles}). ${proposer.displayName} and ${critic.displayName} still disagree — review the discussion above and decide how to proceed.`
+        );
+      } else if (outcome.status === "adversaryUnresolved") {
+        await this.addConductorMessage(
+          `${adversary.displayName} still finds blocking issues after ${outcome.cycles} adversarial cycle(s). Review the attacks above and decide how to proceed.`
         );
       }
     } catch (error) {
@@ -814,18 +833,30 @@ export class AgentRoomController {
     intakeAnswers: string,
     role: DebateRole,
     round: number,
+    cycle: number,
     history: DebateEntry[]
   ): string {
+    const label = (entry: DebateEntry): string =>
+      entry.role === "proposer" ? "Plan" : entry.role === "adversary" ? "Adversarial review" : "Review";
     const debateSoFar = history
-      .map((entry) => `${entry.role === "proposer" ? "Plan" : "Review"} (round ${entry.round}):\n${entry.text}`)
+      .map((entry) => `${label(entry)} (cycle ${entry.role === "adversary" ? entry.round : cycle}):\n${entry.text}`)
       .join("\n\n");
     const roleInstruction =
       role === "proposer"
-        ? round === 1
+        ? cycle === 1 && round === 1
           ? "Propose a concrete, ordered implementation plan for the goal. State assumptions and dependencies."
-          : "Revise your plan to address the reviewer's latest points. Note any points you reject and why."
-        : "Review the latest plan critically: concrete problems, risks, gaps, and missing requirements. If it is genuinely solid, say so plainly.";
-    const verdictInstruction = role === "proposer" ? PROPOSER_VERDICT_INSTRUCTION : CRITIC_VERDICT_INSTRUCTION;
+          : cycle > 1 && round === 1
+            ? "Revise the agreed plan to fix the flaws the adversarial reviewer raised above. Note any you reject and why."
+            : "Revise your plan to address the reviewer's latest points. Note any points you reject and why."
+        : role === "adversary"
+          ? "You are the adversarial reviewer / red team. Attack the agreed plan as hard as you can — strongest failure cases, security holes, edge cases, hidden assumptions, and operational risks. If it genuinely survives, say so plainly."
+          : "Review the latest plan critically: concrete problems, risks, gaps, and missing requirements. If it is genuinely solid, say so plainly.";
+    const verdictInstruction =
+      role === "proposer"
+        ? PROPOSER_VERDICT_INSTRUCTION
+        : role === "adversary"
+          ? ADVERSARY_VERDICT_INSTRUCTION
+          : CRITIC_VERDICT_INSTRUCTION;
     return [
       `Autonomous plan debate — goal:\n"${goal}"`,
       intakeAnswers.trim() ? `User's answers to the clarifying questions:\n${intakeAnswers.trim()}` : "",

@@ -526,6 +526,11 @@
           "default": 6,
           "description": "Hard cap on plan-debate rounds (one round = proposer + critic) before the orchestrator stops and hands the decision to you."
         },
+        "agentRoom.orchestration.maxAdversarialCycles": {
+          "type": "number",
+          "default": 3,
+          "description": "Hard cap on adversarial cycles (debate to consensus, then a red-team attack; on a blocking flaw it loops back to debate) before the orchestrator stops."
+        },
         "agentRoom.orchestration.maxIntakeQuestions": {
           "type": "number",
           "default": 3,

@@ -95,6 +95,7 @@ export function getAgentRoomSettings(): AgentRoomSettings {
     },
     orchestration: {
       maxDebateRounds: get(config, "orchestration.maxDebateRounds", 6),
+      maxAdversarialCycles: get(config, "orchestration.maxAdversarialCycles", 3),
       maxIntakeQuestions: get(config, "orchestration.maxIntakeQuestions", 3),
       orchestratorProvider: get(config, "orchestration.orchestratorProvider", "claudeCodeCli")
     },

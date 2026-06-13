@@ -273,6 +273,8 @@ export interface ModelAdvisorSettings {
 /** agentRoom.orchestration.* settings (autonomous debate engine; docs/ORCHESTRATION_STAGE1.md). */
 export interface OrchestrationSettings {
   maxDebateRounds: number;
+  /** Adversarial cycles (debate → red-team → maybe back to debate). */
+  maxAdversarialCycles: number;
   maxIntakeQuestions: number;
   /** Provider the Conductor reasons through for intake/narration. */
   orchestratorProvider: string;

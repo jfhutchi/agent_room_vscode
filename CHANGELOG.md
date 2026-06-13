@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.3 — 2026-06-13
+
+- **Clean agent replies even with Claude Code hooks.** The Claude stream-json parser
+  now extracts only the assistant message (and final result), ignoring `system`/`hook_*`
+  events — so SessionStart hook output (e.g. "Bun not found", SDK metrics) no longer
+  leaks into the agent's reply.
+- **Model selection** (workspace `.vscode/settings.json`): Claude tiers default to
+  `sonnet` so the room doesn't fall back to an account-gated default model. Change it to
+  any model your CLI can use.
+
 ## 0.2.2 — 2026-06-13
 
 - **Send now gets a reply.** A plain message routed through Send was only logged

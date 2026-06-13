@@ -6,7 +6,7 @@ import {
   ProviderInvocation,
   ProviderResult
 } from "./ProviderTypes";
-import { eventType, extractTextFromEvent, parseJsonLines } from "../utils/jsonl";
+import { parseJsonLines } from "../utils/jsonl";
 import { redactDeep, redactText } from "../utils/redaction";
 import { resultDiagnostics, runCommand } from "../utils/childProcess";
 import { SafetyPolicy } from "./SafetyPolicy";
@@ -104,21 +104,45 @@ function claudeCapabilities(help: string): ProviderCapabilities {
   };
 }
 
+/**
+ * Pull the real answer out of Claude's stream-json. ONLY assistant-message
+ * content (and the final `result` as a fallback) — never `system`/`hook_*`
+ * events, whose `output`/`stderr` fields otherwise leak hook noise (e.g.
+ * "Bun not found", SDK metrics) into the displayed reply.
+ */
+function claudeAssistantText(events: unknown[]): string {
+  const parts: string[] = [];
+  let result = "";
+  for (const event of events) {
+    if (!event || typeof event !== "object") continue;
+    const obj = event as Record<string, unknown>;
+    const type = typeof obj.type === "string" ? obj.type : "";
+    if (type === "assistant") {
+      const message = obj.message as Record<string, unknown> | undefined;
+      const content = message?.content;
+      if (Array.isArray(content)) {
+        for (const item of content) {
+          if (item && typeof item === "object") {
+            const itemText = (item as Record<string, unknown>).text;
+            if (typeof itemText === "string") parts.push(itemText);
+          }
+        }
+      }
+    } else if (type === "result" && typeof obj.result === "string") {
+      result = obj.result;
+    }
+  }
+  const joined = parts.join("").trim();
+  return joined || result.trim();
+}
+
 export function parseClaudeOutput(stdout: string, preferJson: boolean): ParsedProviderOutput {
   if (!preferJson || !stdout.trim().startsWith("{")) {
     return { text: stdout.trim(), events: [], fallbackUsed: true, warnings: [] };
   }
 
   const parsed = parseJsonLines(stdout);
-  const textParts: string[] = [];
-  for (const event of parsed.events) {
-    const type = eventType(event);
-    if (type.includes("error")) continue;
-    const text = extractTextFromEvent(event);
-    if (text.trim()) textParts.push(text);
-  }
-
-  const text = textParts.join("").trim();
+  const text = claudeAssistantText(parsed.events);
   if (!text) {
     return {
       text: parsed.plainLines.join("\n").trim() || stdout.trim(),

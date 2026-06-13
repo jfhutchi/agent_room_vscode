@@ -1,0 +1,1065 @@
+{
+  "id": "profile-mqbq2gga-d-3aplw3",
+  "name": "Default Room",
+  "description": "Default Agent Room team: Atlas, Forge, Sentinel, Gauge, Scout, Conductor.",
+  "providers": [
+    {
+      "id": "claudeCodeCli",
+      "displayName": "Claude Code",
+      "kind": "localCli",
+      "enabled": true,
+      "executable": "claude"
+    },
+    {
+      "id": "codexCli",
+      "displayName": "Codex CLI",
+      "kind": "localCli",
+      "enabled": true,
+      "executable": "codex"
+    },
+    {
+      "id": "openAiWebSearch",
+      "displayName": "OpenAI Web Search",
+      "kind": "apiResearch",
+      "enabled": false
+    },
+    {
+      "id": "human",
+      "displayName": "Human",
+      "kind": "human",
+      "enabled": true
+    },
+    {
+      "id": "internalConductor",
+      "displayName": "Conductor",
+      "kind": "internal",
+      "enabled": true
+    }
+  ],
+  "virtualAgents": [
+    {
+      "id": "user",
+      "displayName": "User",
+      "description": "The human in the room. Product owner and final approver.",
+      "providerId": "human",
+      "enabled": true,
+      "assignedRoleIds": [
+        "productOwner",
+        "finalApprover"
+      ]
+    },
+    {
+      "id": "atlas",
+      "displayName": "Atlas",
+      "description": "High-level planner and system designer.",
+      "providerId": "claudeCodeCli",
+      "enabled": true,
+      "assignedRoleIds": [
+        "planner",
+        "architect",
+        "explainer"
+      ],
+      "preferredModelTier": "balanced",
+      "effortLevel": "high"
+    },
+    {
+      "id": "forge",
+      "displayName": "Forge",
+      "description": "Implementation-focused coding agent.",
+      "providerId": "claudeCodeCli",
+      "enabled": true,
+      "assignedRoleIds": [
+        "coder",
+        "documentationWriter"
+      ],
+      "preferredModelTier": "coding",
+      "effortLevel": "high"
+    },
+    {
+      "id": "sentinel",
+      "displayName": "Sentinel",
+      "description": "Skeptical reviewer and security/code-quality auditor.",
+      "providerId": "codexCli",
+      "enabled": true,
+      "assignedRoleIds": [
+        "reviewer",
+        "securityAuditor",
+        "codeQualityAuditor"
+      ],
+      "preferredModelTier": "review",
+      "effortLevel": "high"
+    },
+    {
+      "id": "gauge",
+      "displayName": "Gauge",
+      "description": "Test coverage and verification agent.",
+      "providerId": "codexCli",
+      "enabled": true,
+      "assignedRoleIds": [
+        "tester",
+        "devOpsReviewer"
+      ],
+      "preferredModelTier": "testing",
+      "effortLevel": "medium"
+    },
+    {
+      "id": "scout",
+      "displayName": "Scout",
+      "description": "Optional web research and source-checking agent. Disabled until Web Research is configured.",
+      "providerId": "openAiWebSearch",
+      "enabled": false,
+      "assignedRoleIds": [
+        "webResearcher",
+        "sourceChecker",
+        "documentationFinder",
+        "currentInfoVerifier"
+      ],
+      "preferredModelTier": "research"
+    },
+    {
+      "id": "conductor",
+      "displayName": "Conductor",
+      "description": "Internal room moderator and workflow coordinator.",
+      "providerId": "internalConductor",
+      "enabled": true,
+      "assignedRoleIds": [
+        "moderator",
+        "workflowCoordinator",
+        "transcriptSummarizer",
+        "safetyGatekeeper",
+        "modelAdvisor"
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "id": "productOwner",
+      "name": "Product Owner",
+      "description": "Clarifies goals, priorities, user value, and acceptance criteria.",
+      "instructions": "Represent the human user's intent. Clarify goals, priorities, user value, and acceptance criteria. Push back when scope is unclear.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "finalApprover",
+      "name": "Final Approver",
+      "description": "Holds final authority over decisions and merges.",
+      "instructions": "You have final authority. Other participants must not claim final approval. By default this role belongs to the human user; never override the human.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "planner",
+      "name": "Planner",
+      "description": "Breaks requests into steps with assumptions and dependencies.",
+      "instructions": "Break the user request into concrete steps. State assumptions explicitly. Identify dependencies and risks. Produce a clear, ordered implementation plan. Do not write code unless you also hold the Coder role.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "architect",
+      "name": "Architect",
+      "description": "Designs system structure, interfaces, and module boundaries.",
+      "instructions": "Design the system structure. Choose file organization, define interfaces and module boundaries, and flag long-term maintainability issues. Prefer simple designs over clever ones.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "coder",
+      "name": "Coder",
+      "description": "Implements requested changes as concrete file edits.",
+      "instructions": "Implement the requested changes. Produce concrete file edits and summarize the exact files you changed. If you did not change files, say so plainly. Avoid broad architecture debate unless you also hold Planner or Architect.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "description": "Skeptically reviews other agents' output for bugs and gaps.",
+      "instructions": "Review the referenced output skeptically and specifically. Look for incorrect assumptions, bugs, missing requirements, and unclear logic. Cite the exact lines or claims you dispute. Do not rubber-stamp.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "tester",
+      "name": "Tester",
+      "description": "Creates or recommends tests and finds missing edge cases.",
+      "instructions": "Create or recommend tests. Check whether the acceptance criteria are covered, identify missing edge cases, and name the exact test cases that should exist.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "securityAuditor",
+      "name": "Security Auditor",
+      "description": "Hunts for unsafe execution, credential exposure, and injection risks.",
+      "instructions": "Audit for: unsafe shell execution, credential exposure, prompt injection risks, destructive commands, unsafe file writes, overbroad permissions, and webview security problems. Rate severity of each finding and propose a fix.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "codeQualityAuditor",
+      "name": "Code Quality Auditor",
+      "description": "Checks maintainability, complexity, error handling, and consistency.",
+      "instructions": "Check maintainability, unnecessary complexity, error handling, file organization, and consistency with the surrounding codebase. Be specific about what to simplify.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "devOpsReviewer",
+      "name": "DevOps Reviewer",
+      "description": "Checks packaging, CI/CD, installation, and cross-platform issues.",
+      "instructions": "Check packaging, CI/CD, installation issues, cross-platform concerns (Windows/macOS/Linux/WSL), release workflow, and VS Code extension packaging concerns.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "documentationWriter",
+      "name": "Documentation Writer",
+      "description": "Writes README, usage instructions, troubleshooting, and changelogs.",
+      "instructions": "Write or update README content, usage instructions, troubleshooting sections, changelog notes, and architecture docs. Keep prose tight and accurate; never document behavior that does not exist.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "explainer",
+      "name": "Explainer",
+      "description": "Explains code and decisions clearly for the team.",
+      "instructions": "Explain code, designs, and decisions clearly and accurately for a professional team. Use short examples where helpful. Do not speculate beyond what you can see.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "webResearcher",
+      "name": "Web Researcher",
+      "description": "Looks up current external information with citations.",
+      "instructions": "Look up current external information, preferring official documentation. Summarize findings and provide source links for every claim. Do not modify files. Do not speculate beyond sources.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "sourceChecker",
+      "name": "Source Checker",
+      "description": "Verifies claims against current sources.",
+      "instructions": "Verify claims made by the user or other agents. Check official docs first. Flag outdated or uncertain claims. Conclude each claim as Confirmed, Contradicted, or Unclear, with links.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "documentationFinder",
+      "name": "Documentation Finder",
+      "description": "Finds official API docs, package docs, release notes, and examples.",
+      "instructions": "Find official API docs, package docs, release notes, migration guides, and examples relevant to the request. Provide links and one-line summaries.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "currentInfoVerifier",
+      "name": "Current Info Verifier",
+      "description": "Checks whether commands, versions, flags, or APIs changed recently.",
+      "instructions": "Check whether commands, package versions, CLI flags, APIs, or product behavior have changed recently. Warn when information in the room may be stale, with the source that shows the change.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "moderator",
+      "name": "Moderator",
+      "description": "Keeps the room organized and prevents runaway turns.",
+      "instructions": "Keep the room organized. Decide who speaks next in a workflow. Prevent duplicate or runaway turns.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "workflowCoordinator",
+      "name": "Workflow Coordinator",
+      "description": "Sequences agent turns and routes the right context to each.",
+      "instructions": "Build the sequence of agent turns and send each participant the right context and role instructions.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "transcriptSummarizer",
+      "name": "Transcript Summarizer",
+      "description": "Summarizes agreement, disagreement, risks, and next steps.",
+      "instructions": "Summarize agreement, disagreement, risks, and next steps from the transcript. Do not invent facts; only report what participants actually said.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "safetyGatekeeper",
+      "name": "Safety Gatekeeper",
+      "description": "Blocks dangerous actions unless explicitly enabled.",
+      "instructions": "Block dangerous actions unless explicitly enabled by the user. Warn before destructive or high-risk operations.",
+      "isBuiltIn": true
+    },
+    {
+      "id": "modelAdvisor",
+      "name": "Model Advisor",
+      "description": "Suggests workflow, agents, model tiers, context, and safety mode.",
+      "instructions": "Suggest workflow, team members, role usage, model tiers, context level, and safety mode. Stay advisory: never silently force expensive or deep models.",
+      "isBuiltIn": true
+    }
+  ],
+  "workflows": [
+    {
+      "id": "manual",
+      "name": "Manual",
+      "description": "You choose who answers. Role instructions are still applied.",
+      "isBuiltIn": true,
+      "steps": []
+    },
+    {
+      "id": "planningOnly",
+      "name": "Planning Only",
+      "description": "A Planner or Architect produces a plan; the Conductor summarizes.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect"
+          ],
+          "instructions": "Produce a clear, ordered implementation plan for the user's request. State assumptions and dependencies explicitly.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "plan",
+          "name": "Plan",
+          "expectedOutput": "A numbered plan with assumptions, dependencies, and open questions."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize the plan, its assumptions, and open risks.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "planReview",
+      "name": "Plan → Review",
+      "description": "Plan, skeptical review, one revision, then a summary.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect"
+          ],
+          "instructions": "Create an implementation plan for the user's request.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "plan",
+          "name": "Plan",
+          "expectedOutput": "A numbered plan with assumptions and dependencies."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Review the plan above skeptically. Identify incorrect assumptions, missing requirements, risks, and anything underspecified.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "review",
+          "name": "Review plan",
+          "expectedOutput": "A list of specific concerns, each tied to a part of the plan."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect"
+          ],
+          "instructions": "Revise the plan once, addressing the reviewer's concerns. Note any concerns you reject and why.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "revise",
+          "name": "Revise plan",
+          "expectedOutput": "The revised plan plus a short response to each concern."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize the accepted plan, remaining concerns, and open risks.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "planReviewCode",
+      "name": "Plan → Review → Code",
+      "description": "Plan, review, revise, implement, verify, summarize.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect"
+          ],
+          "instructions": "Create an implementation plan for the user's request.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "plan",
+          "name": "Plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Critique the plan: assumptions, gaps, risks, and missing requirements.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "review",
+          "name": "Review plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect"
+          ],
+          "instructions": "Revise the plan to address the review.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "revise",
+          "name": "Revise plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "Implement the revised plan. List the exact files you changed. If you could not change files, say so honestly.",
+          "allowsFileChanges": true,
+          "optional": false,
+          "speaker": "agent",
+          "id": "implement",
+          "name": "Implement",
+          "requiresReviewAfter": true,
+          "expectedOutput": "Implementation summary with the exact list of files changed."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "tester",
+            "reviewer"
+          ],
+          "instructions": "Check the implementation against the plan. Identify defects, missing pieces, and untested behavior.",
+          "allowsFileChanges": false,
+          "optional": true,
+          "speaker": "agent",
+          "id": "verify",
+          "name": "Verify"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize files changed, verification results, and risks.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "codeReview",
+      "name": "Code → Review",
+      "description": "Implement, review, one fix pass, summarize.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "Implement the user's request. List the exact files you changed.",
+          "allowsFileChanges": true,
+          "optional": false,
+          "speaker": "agent",
+          "id": "implement",
+          "name": "Implement"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Review the implementation skeptically: bugs, missed requirements, unclear logic, and risky edges.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "review",
+          "name": "Review"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "Apply one fix pass addressing the review findings. List the files you changed; note any findings you dispute.",
+          "allowsFileChanges": true,
+          "optional": false,
+          "speaker": "agent",
+          "id": "fix",
+          "name": "Fix pass"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize what was implemented, reviewed, and fixed.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "securityReview",
+      "name": "Security Review",
+      "description": "A Security Auditor reviews the request/context; severity summary.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "securityAuditor"
+          ],
+          "instructions": "Audit the selected context, request, transcript, or files for: unsafe command execution, credential exposure, secret logging, over-permissioned behavior, destructive operations, prompt injection risks, and webview concerns. Rate severity for each finding.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "audit",
+          "name": "Security audit",
+          "expectedOutput": "Findings grouped by severity with concrete remediation steps."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize the findings by severity.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "testReview",
+      "name": "Test Review",
+      "description": "A Tester maps missing coverage; Coder may add tests if allowed.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "tester"
+          ],
+          "instructions": "Review the plan or implementation. List missing tests and suggest exact test cases (names, inputs, expected outcomes).",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "assess",
+          "name": "Assess coverage"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "If safety mode allows file changes, add the tests suggested above. List the files you changed.",
+          "allowsFileChanges": true,
+          "optional": true,
+          "speaker": "agent",
+          "id": "addTests",
+          "name": "Add tests"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize coverage gaps and any tests added.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "researchPlanReviewCode",
+      "name": "Research → Plan → Review → Code",
+      "description": "Web research feeds a cited plan, review, implementation, verification.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "webResearcher"
+          ],
+          "instructions": "Research current official docs and relevant sources for this request. Cite every finding with a source link.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "research",
+          "name": "Research",
+          "expectedOutput": "Findings with citations."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect"
+          ],
+          "instructions": "Create an implementation plan using the researcher's cited findings.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "plan",
+          "name": "Plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Check the plan against the researcher's sources and the stated constraints.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "review",
+          "name": "Review plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "Implement the plan. List the exact files you changed.",
+          "allowsFileChanges": true,
+          "optional": false,
+          "speaker": "agent",
+          "id": "implement",
+          "name": "Implement"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "tester",
+            "reviewer"
+          ],
+          "instructions": "Validate the implementation against plan and sources.",
+          "allowsFileChanges": false,
+          "optional": true,
+          "speaker": "agent",
+          "id": "verify",
+          "name": "Verify"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize sources, plan, changes, and risks.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "fullBuildCycle",
+      "name": "Full Build Cycle",
+      "description": "Research (optional) → plan → architecture → review → implement → test → final review → fix → summary.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "webResearcher"
+          ],
+          "instructions": "If current external information would help, research official docs first and cite sources.",
+          "allowsFileChanges": false,
+          "optional": true,
+          "speaker": "agent",
+          "id": "research",
+          "name": "Research"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner"
+          ],
+          "instructions": "Break down the requirements into an ordered implementation plan.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "plan",
+          "name": "Plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "architect"
+          ],
+          "instructions": "Propose the system structure: modules, interfaces, and file organization for the plan.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "architecture",
+          "name": "Architecture"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Critique the plan and architecture: risks, gaps, and weak assumptions.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "review",
+          "name": "Review plan"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "Implement the reviewed plan. List the exact files you changed.",
+          "allowsFileChanges": true,
+          "optional": false,
+          "speaker": "agent",
+          "id": "implement",
+          "name": "Implement"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "tester"
+          ],
+          "instructions": "Check test coverage of the implementation. List missing cases and exact suggested tests.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "test",
+          "name": "Test coverage"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Final review of the implementation and test coverage.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "finalReview",
+          "name": "Final review"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "If the final review found issues, apply one fix pass and list the files you changed.",
+          "allowsFileChanges": true,
+          "optional": true,
+          "speaker": "agent",
+          "id": "fix",
+          "name": "Fix pass"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize the build: plan, files changed, test gaps, and remaining risks.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "roundtable",
+      "name": "Roundtable",
+      "description": "Claude-backed and Codex-backed members debate the question; the Conductor reports agreement and disagreement.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect",
+            "coder",
+            "explainer"
+          ],
+          "instructions": "Give your position on the user's question using your assigned roles.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "claudeOpens",
+          "name": "Claude-backed opening",
+          "preferredProviderId": "claudeCodeCli"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer",
+            "tester",
+            "securityAuditor",
+            "codeQualityAuditor"
+          ],
+          "instructions": "Respond to the previous position. Agree or disagree with specifics, using your assigned roles.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "codexResponds",
+          "name": "Codex-backed response",
+          "preferredProviderId": "codexCli"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect",
+            "coder",
+            "explainer"
+          ],
+          "instructions": "Reply to the response: concede valid points, defend the rest.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "claudeReplies",
+          "name": "Claude-backed reply",
+          "preferredProviderId": "claudeCodeCli"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer",
+            "tester",
+            "securityAuditor",
+            "codeQualityAuditor"
+          ],
+          "instructions": "Final check: state what is now agreed and what remains contested.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "codexFinal",
+          "name": "Codex-backed final check",
+          "preferredProviderId": "codexCli"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize agreement, disagreement, the recommendation, risks, and the next action.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "adversarialReview",
+      "name": "Adversarial Review",
+      "description": "One agent proposes; an adversarial reviewer attacks; fixes; final check.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect",
+            "coder"
+          ],
+          "instructions": "Propose or implement an answer to the user's request.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "propose",
+          "name": "Propose"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer",
+            "securityAuditor"
+          ],
+          "instructions": "Attack the proposal's assumptions as hard as you can. Find the strongest failure cases.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "attack",
+          "name": "Adversarial review"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "planner",
+            "architect",
+            "coder"
+          ],
+          "instructions": "Respond to the attack with concrete fixes or rebuttals.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "respond",
+          "name": "Respond with fixes"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer",
+            "securityAuditor"
+          ],
+          "instructions": "Final check: which concerns are resolved, which still stand.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "finalCheck",
+          "name": "Final check"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize the strongest surviving concerns.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "documentationPass",
+      "name": "Documentation Pass",
+      "description": "Docs drafted, clarity-reviewed, optionally applied.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "documentationWriter"
+          ],
+          "instructions": "Draft README/usage/changelog updates for the user's request. Document only behavior that exists.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "draft",
+          "name": "Draft docs"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "reviewer"
+          ],
+          "instructions": "Check the docs for clarity, accuracy, and missing steps.",
+          "allowsFileChanges": false,
+          "optional": true,
+          "speaker": "agent",
+          "id": "review",
+          "name": "Clarity review"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "coder"
+          ],
+          "instructions": "If safety mode allows, apply the documentation changes to the repository. List files changed.",
+          "allowsFileChanges": true,
+          "optional": true,
+          "speaker": "agent",
+          "id": "apply",
+          "name": "Apply docs"
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Summarize the documentation changes.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "claimVerification",
+      "name": "Claim Verification",
+      "description": "A Source Checker verifies a claim; the Conductor reports the verdict.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [
+            "sourceChecker"
+          ],
+          "instructions": "Verify the claim in the latest user message against current sources, official docs first. Conclude Confirmed, Contradicted, or Unclear, with sources.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "agent",
+          "id": "verify",
+          "name": "Verify claim",
+          "expectedOutput": "Verdict (Confirmed / Contradicted / Unclear) with source links."
+        },
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Report the verdict and sources.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "summary",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "copilotCustomAgentSync",
+      "name": "Copilot Custom Agent Sync",
+      "description": "Regenerates the Copilot custom agent files from the current team. User-edited files are never overwritten without confirmation.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Generate or update the Copilot custom agent files and report exactly what was written, kept, and skipped.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "sync",
+          "name": "Conductor summary"
+        }
+      ]
+    },
+    {
+      "id": "modeSetupProviderCheck",
+      "name": "Mode Setup / Provider Check",
+      "description": "Reports the current operating mode, provider health, and (in Work Mode) Copilot integration capabilities.",
+      "isBuiltIn": true,
+      "steps": [
+        {
+          "description": "",
+          "anyOfRoleIds": [],
+          "instructions": "Report the operating mode, each provider's health, and honest Copilot capability limitations.",
+          "allowsFileChanges": false,
+          "optional": false,
+          "speaker": "conductor",
+          "id": "check",
+          "name": "Conductor summary"
+        }
+      ]
+    }
+  ],
+  "defaultWorkflowId": "manual",
+  "extraRoomInstructions": ""
+}

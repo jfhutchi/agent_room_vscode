@@ -192,20 +192,35 @@
       const roleCell = document.createElement("div");
       const roleName = document.createElement("strong");
       roleName.textContent = text(role.name);
+      if (role.singleton) {
+        const tag = document.createElement("span");
+        tag.className = "role-singleton";
+        tag.textContent = " (one holder)";
+        roleName.appendChild(tag);
+      }
       const roleDescription = document.createElement("div");
       roleDescription.className = "role-description";
       roleDescription.textContent = text(role.description);
       roleCell.append(roleName, roleDescription);
       row.appendChild(roleCell);
+      const rowInputs = [];
       for (const agent of agents) {
         const label = document.createElement("label");
         label.className = "role-cell";
         const input = document.createElement("input");
         input.type = "checkbox";
         input.checked = (agent.assignedRoleIds || []).includes(role.id);
-        input.addEventListener("change", () =>
-          post({ type: "updateRoleAssignment", agentId: agent.id, roleId: role.id, assigned: input.checked })
-        );
+        input.addEventListener("change", () => {
+          // Singleton roles allow at most one holder: checking one clears the
+          // rest of the row immediately (the controller enforces it too).
+          if (role.singleton && input.checked) {
+            for (const other of rowInputs) {
+              if (other !== input) other.checked = false;
+            }
+          }
+          post({ type: "updateRoleAssignment", agentId: agent.id, roleId: role.id, assigned: input.checked });
+        });
+        rowInputs.push(input);
         label.appendChild(input);
         row.appendChild(label);
       }

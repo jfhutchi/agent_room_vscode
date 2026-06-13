@@ -302,6 +302,12 @@ h2 {
   background: var(--vscode-badge-background);
 }
 
+.role-singleton {
+  color: var(--room-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
 .role-matrix {
   overflow: auto;
   border: 1px solid var(--room-border);

@@ -54,6 +54,8 @@ export interface RoleDefinition {
   description: string;
   instructions: string;
   isBuiltIn: boolean;
+  /** Single-holder role: at most one agent may hold it (e.g. Final Approver). */
+  singleton?: boolean;
   allowedProviderKinds?: ProviderKind[];
 }
 

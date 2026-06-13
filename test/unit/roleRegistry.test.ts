@@ -11,6 +11,17 @@ test("role registry loads built-in roles", () => {
   assert.ok(registry.get(ROLE_IDS.finalApprover));
 });
 
+test("Product Owner and Final Approver are singleton roles; collaborative roles are not", () => {
+  const registry = new RoleRegistry();
+
+  assert.equal(registry.get(ROLE_IDS.productOwner)?.singleton, true);
+  assert.equal(registry.get(ROLE_IDS.finalApprover)?.singleton, true);
+  // Shareable roles must not be marked singleton.
+  assert.notEqual(registry.get(ROLE_IDS.coder)?.singleton, true);
+  assert.notEqual(registry.get(ROLE_IDS.reviewer)?.singleton, true);
+  assert.notEqual(registry.get(ROLE_IDS.planner)?.singleton, true);
+});
+
 test("team members can hold multiple roles and roles can be shared", () => {
   const team = new VirtualTeamRegistry();
 

@@ -118,6 +118,13 @@ export class RoomProfileStore {
       Array.isArray(p.providers) && p.providers.length > 0 ? p.providers : defaults.providers;
     const virtualAgents = p.virtualAgents;
     this.validateModeProviderReferences(providers, virtualAgents);
+    // Refresh structural flags on built-in roles from the canonical definitions
+    // (e.g. `singleton`), so profiles saved before a flag existed still pick it
+    // up — without clobbering user-edited name/description/instructions.
+    const builtInSingleton = new Map(builtInRoles().map((role) => [role.id, role.singleton === true]));
+    const roles = p.roles.map((role) =>
+      builtInSingleton.has(role.id) ? { ...role, singleton: builtInSingleton.get(role.id) } : role
+    );
     // Merge tolerant: anything missing falls back to defaults so old exports
     // keep working after upgrades.
     return {
@@ -126,7 +133,7 @@ export class RoomProfileStore {
       description: typeof p.description === "string" ? p.description : defaults.description,
       providers,
       virtualAgents,
-      roles: p.roles,
+      roles,
       workflows:
         Array.isArray(p.workflows) && p.workflows.length > 0 ? p.workflows : defaults.workflows,
       defaultWorkflowId:

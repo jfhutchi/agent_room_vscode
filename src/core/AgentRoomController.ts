@@ -1471,8 +1471,21 @@ export class AgentRoomController {
     const profile = this.requireProfile();
     const agent = profile.virtualAgents.find((entry) => entry.id === agentId);
     if (!agent) throw new Error(`Team member not found: ${agentId}`);
-    if (assigned && !agent.assignedRoleIds.includes(roleId)) agent.assignedRoleIds.push(roleId);
-    if (!assigned) agent.assignedRoleIds = agent.assignedRoleIds.filter((id) => id !== roleId);
+    if (assigned) {
+      // Singleton roles (Product Owner, Final Approver) have at most one holder:
+      // assigning to one agent clears it from everyone else.
+      const singleton = profile.roles.find((role) => role.id === roleId)?.singleton === true;
+      if (singleton) {
+        for (const other of profile.virtualAgents) {
+          if (other.id !== agentId) {
+            other.assignedRoleIds = other.assignedRoleIds.filter((id) => id !== roleId);
+          }
+        }
+      }
+      if (!agent.assignedRoleIds.includes(roleId)) agent.assignedRoleIds.push(roleId);
+    } else {
+      agent.assignedRoleIds = agent.assignedRoleIds.filter((id) => id !== roleId);
+    }
     await this.requireProfileStore().save(profile);
     await this.hydrate();
   }

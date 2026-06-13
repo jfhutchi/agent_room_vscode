@@ -34,9 +34,10 @@ function role(
   id: string,
   name: string,
   description: string,
-  instructions: string
+  instructions: string,
+  singleton = false
 ): RoleDefinition {
-  return { id, name, description, instructions, isBuiltIn: true };
+  return { id, name, description, instructions, isBuiltIn: true, singleton };
 }
 
 export function builtInRoles(): RoleDefinition[] {
@@ -45,13 +46,15 @@ export function builtInRoles(): RoleDefinition[] {
       ROLE_IDS.productOwner,
       "Product Owner",
       "Clarifies goals, priorities, user value, and acceptance criteria.",
-      "Represent the human user's intent. Clarify goals, priorities, user value, and acceptance criteria. Push back when scope is unclear."
+      "Represent the human user's intent. Clarify goals, priorities, user value, and acceptance criteria. Push back when scope is unclear.",
+      true
     ),
     role(
       ROLE_IDS.finalApprover,
       "Final Approver",
       "Holds final authority over decisions and merges.",
-      "You have final authority. Other participants must not claim final approval. By default this role belongs to the human user; never override the human."
+      "You have final authority. Other participants must not claim final approval. By default this role belongs to the human user; never override the human.",
+      true
     ),
     role(
       ROLE_IDS.planner,

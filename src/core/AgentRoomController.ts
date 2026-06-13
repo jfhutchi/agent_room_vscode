@@ -838,8 +838,12 @@ export class AgentRoomController {
   ): string {
     const label = (entry: DebateEntry): string =>
       entry.role === "proposer" ? "Plan" : entry.role === "adversary" ? "Adversarial review" : "Review";
+    // An adversary entry carries its cycle in `round`; debate entries carry their
+    // round. Don't assert a single cycle across history seeded from earlier cycles.
     const debateSoFar = history
-      .map((entry) => `${label(entry)} (cycle ${entry.role === "adversary" ? entry.round : cycle}):\n${entry.text}`)
+      .map((entry) =>
+        `${label(entry)}${entry.role === "adversary" ? ` (cycle ${entry.round})` : ` (round ${entry.round})`}:\n${entry.text}`
+      )
       .join("\n\n");
     const roleInstruction =
       role === "proposer"

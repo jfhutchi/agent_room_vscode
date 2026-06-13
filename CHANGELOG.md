@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 — 2026-06-13
+
+- **Autonomous orchestration.** "Start Orchestrated Build" runs intake → debate →
+  consensus → adversarial review (Atlas proposes, Sentinel reviews, a Security Auditor
+  red-teams the plan), hands-off within a stage, with round/cycle caps, Stop, and an
+  approval gate. Personal Mode only.
+- **Singleton roles.** Product Owner and Final Approver allow only one holder.
+- **Chat redesign.** Sender avatars, markdown + code blocks, quiet metadata, hover
+  actions; the composer now clears after Send / Start Build / Run Workflow.
+- **Windows CLI detection fixes.** cmd.exe shim quoting; auth-status heuristic no longer
+  false-flags a logged-in CLI.
+- **Direction adopted** (docs/ORCHESTRATION_PLAN.md): approval-gate orchestration engine;
+  Work Mode tabled; no ollama runtime for now.
+
 ## 0.1.0 — 2026-06-12
 
 - **Operating modes:** Work / Copilot Native vs Personal / Local CLI, per-workspace,

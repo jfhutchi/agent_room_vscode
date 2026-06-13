@@ -2,7 +2,7 @@
   "name": "agent-room",
   "displayName": "Agent Room",
   "description": "A professional VS Code multi-agent coding room. Coordinate Claude Code, Codex CLI, and optional web research as named virtual team members with roles and workflows in one native chat panel, with no terminal spam.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "agent-room-publisher-placeholder",
   "license": "Apache-2.0",
   "repository": {

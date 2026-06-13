@@ -109,8 +109,15 @@ function codexCapabilities(help: string): ProviderCapabilities {
   };
 }
 
+/**
+ * Only treat the CLI as logged-out on a concrete signal — not on `--help`
+ * text, which documents auth flags and uses words like "required". See the
+ * matching note in ClaudeCodeProvider.
+ */
+const LOGGED_OUT = /(not\s+(logged\s*in|authenticated|signed\s*in)|please\s+(log|sign)\s*in|invalid\s+api\s+key|unauthorized|authentication\s+(failed|required))/i;
+
 function authLikely(text: string): boolean {
-  return !/(login|auth|authenticate|not\s+authenticated|required)/i.test(text);
+  return !LOGGED_OUT.test(text);
 }
 
 export function parseCodexOutput(stdout: string, preferJson: boolean): ParsedCodexOutput {
@@ -174,14 +181,16 @@ export class CodexCliProvider implements Provider {
       timeoutMs: this.options.timeoutMs,
       label: "codex --help"
     });
-    const combined = `${version.stdout}\n${version.stderr}\n${help.stdout}\n${help.stderr}`;
+    // Probe only the version invocation's output for a logged-out signal; --help
+    // documents auth flags and would false-trip the heuristic.
+    const authProbe = `${version.stdout}\n${version.stderr}`;
     this.capabilities = codexCapabilities(help.stdout || help.stderr);
     const available = !version.failedToStart && (version.exitCode === 0 || help.exitCode === 0);
     return {
       providerId: this.id,
       available,
       configured: available,
-      authenticatedLikely: authLikely(combined),
+      authenticatedLikely: authLikely(authProbe),
       executable: this.options.executable,
       versionText: redactText(version.stdout || version.stderr).trim(),
       helpText: redactText(help.stdout || help.stderr).slice(0, 8000),

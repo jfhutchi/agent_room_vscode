@@ -59,6 +59,18 @@ function quoteForCmd(arg: string): string {
   return `"${arg.replace(/"/g, "")}"`;
 }
 
+/**
+ * Build the argv for the `cmd.exe` fallback. cmd.exe /S strips the FIRST and
+ * LAST quote of everything after /C, so the per-argument-quoted line must be
+ * wrapped in one more outer quote pair — otherwise `"codex" "--version"`
+ * collapses to the garbled `codex" "--version` and cmd reports
+ * "not recognized as an internal or external command".
+ */
+export function buildWindowsCmdArguments(executable: string, args: string[]): string[] {
+  const commandLine = [quoteForCmd(executable), ...args.map(quoteForCmd)].join(" ");
+  return ["/d", "/s", "/c", `"${commandLine}"`];
+}
+
 interface SpawnPlan {
   executable: string;
   args: string[];
@@ -89,10 +101,9 @@ function windowsCmdPlan(opts: RunCommandOptions): SpawnPlan | { error: string } 
       };
     }
   }
-  const commandLine = [quoteForCmd(opts.executable), ...opts.args.map(quoteForCmd)].join(" ");
   return {
     executable: process.env.ComSpec || "cmd.exe",
-    args: ["/d", "/s", "/c", commandLine],
+    args: buildWindowsCmdArguments(opts.executable, opts.args),
     options: {
       cwd: opts.cwd,
       env: opts.env ?? process.env,

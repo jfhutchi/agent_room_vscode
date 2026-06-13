@@ -80,8 +80,16 @@ export interface ParsedProviderOutput {
   warnings: string[];
 }
 
-function authLikely(text: string): boolean {
-  return !/(login|auth|authenticate|not\s+authenticated|api\s+key|required)/i.test(text);
+/**
+ * Only treat the CLI as logged-out on a concrete signal. `--version` and
+ * `--help` describe auth flags and use words like "required"/"API key", so
+ * scanning them produced false "needs auth" reports; we look only for an
+ * explicit logged-out phrase, and only in the version invocation's output.
+ */
+const LOGGED_OUT = /(not\s+(logged\s*in|authenticated|signed\s*in)|please\s+(log|sign)\s*in|invalid\s+api\s+key|unauthorized|authentication\s+(failed|required))/i;
+
+export function authLikely(text: string): boolean {
+  return !LOGGED_OUT.test(text);
 }
 
 function claudeCapabilities(help: string): ProviderCapabilities {
@@ -156,14 +164,16 @@ export class ClaudeCodeProvider implements Provider {
       timeoutMs: this.options.timeoutMs,
       label: "claude --help"
     });
-    const combined = `${version.stdout}\n${version.stderr}\n${help.stdout}\n${help.stderr}`;
+    // Auth status cannot be read from --help (it documents auth flags); probe
+    // only the version invocation's own output for an explicit logged-out signal.
+    const authProbe = `${version.stdout}\n${version.stderr}`;
     this.capabilities = claudeCapabilities(help.stdout || help.stderr);
     const available = !version.failedToStart && (version.exitCode === 0 || help.exitCode === 0);
     return {
       providerId: this.id,
       available,
       configured: available,
-      authenticatedLikely: authLikely(combined),
+      authenticatedLikely: authLikely(authProbe),
       executable: this.options.executable,
       versionText: redactText(version.stdout || version.stderr).trim(),
       helpText: redactText(help.stdout || help.stderr).slice(0, 8000),

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  authLikely,
   buildClaudeArgs,
   ClaudeCodeProvider,
   CLAUDE_NOT_AVAILABLE_MESSAGE
 } from "../../src/core/ClaudeCodeProvider";
+import { buildWindowsCmdArguments } from "../../src/utils/childProcess";
 import {
   buildCodexArgs,
   CodexCliProvider,
@@ -145,6 +147,33 @@ test("dangerous flags smuggled through a model name are blocked before spawning"
   const codexResult = await codex.runTurn(invocation("codexCli"));
   assert.equal(codexResult.status, "error");
   assert.match(codexResult.finalText, /Blocked dangerous flag/);
+});
+
+test("cmd.exe fallback wraps the per-arg-quoted line in an outer quote pair", () => {
+  // Regression: without the outer pair, cmd.exe /S stripped the wrong quotes
+  // and `.cmd`/`.ps1` shims (codex) failed with "not recognized".
+  assert.deepEqual(buildWindowsCmdArguments("codex", ["--version"]), [
+    "/d",
+    "/s",
+    "/c",
+    '""codex" "--version""'
+  ]);
+  // The inner content, after cmd /S strips the outer pair, is intact.
+  const inner = buildWindowsCmdArguments("codex", ["exec", "--cd", "C:/My Repo"])[3];
+  assert.equal(inner.startsWith('"') && inner.endsWith('"'), true);
+  assert.equal(inner.slice(1, -1), '"codex" "exec" "--cd" "C:/My Repo"');
+});
+
+test("auth heuristic does not false-flag help text, but catches real logout signals", () => {
+  // Regression: --help/--version text legitimately contains auth/required/API
+  // key and must NOT read as logged-out (this showed Claude as needsAuth).
+  assert.equal(authLikely("2.1.177 (Claude Code)"), true);
+  assert.equal(authLikely("Anthropic auth is required. --api-key <key> required"), true);
+  assert.equal(authLikely("codex-cli 0.139.0"), true);
+  // Concrete logged-out phrases still report not-authenticated.
+  assert.equal(authLikely("Not logged in. Please log in to continue."), false);
+  assert.equal(authLikely("Invalid API key provided"), false);
+  assert.equal(authLikely("Error: unauthorized"), false);
 });
 
 test("health checks use the canonical §12 friendly strings when the CLI is missing", async () => {

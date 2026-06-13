@@ -585,7 +585,8 @@ export class AgentRoomController {
       const advisor = this.createAdvisor();
       const recommendation = advisor.recommend(text);
       this.rememberRecommendation(recommendation, text);
-      await this.addConductorMessage(new Conductor().recommendationText(recommendation));
+      // Surface the recommendation only in the advisor panel — not also as a
+      // Conductor transcript message, which duplicated it on every turn.
       await this.panel?.post({ type: "modelAdvisorRecommendation", recommendation });
       if (this.settings.modelAdvisor.autoApply && !recommendation.requiresConfirmation) {
         await this.runWorkflow(recommendation.workflowId, text, false);

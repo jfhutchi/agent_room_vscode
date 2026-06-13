@@ -219,59 +219,255 @@
     return div;
   }
 
+  const AVATAR_PALETTE = ["#6c8eef", "#e0728c", "#3aa675", "#c9893a", "#9a6fd0", "#3a9bb8", "#c2603a"];
+
+  function hashIndex(value, count) {
+    let hash = 0;
+    const str = String(value || "");
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return hash % count;
+  }
+
+  function initialFor(name) {
+    const match = String(name || "?").trim().match(/[A-Za-z0-9]/);
+    return (match ? match[0] : "?").toUpperCase();
+  }
+
+  function messageKind(message) {
+    if (message.participantKind === "user") return "user";
+    if (message.participantKind === "conductor") return "conductor";
+    if (message.participantKind === "system") return "system";
+    return "agent";
+  }
+
+  function metaTag(message) {
+    const parts = [];
+    if (
+      message.providerId &&
+      message.providerId !== "human" &&
+      message.providerId !== "internalConductor"
+    ) {
+      parts.push(providerName(message.providerId));
+    }
+    const model =
+      message.concreteModelName ||
+      (message.modelTier && message.modelTier !== "providerDefault" ? message.modelTier : null);
+    if (model) parts.push(model);
+    if (message.effortLevel) parts.push(`${message.effortLevel} effort`);
+    return parts.join(" · ");
+  }
+
+  function messageTime(message) {
+    const stamp = message.createdAt ? new Date(message.createdAt) : null;
+    return stamp && !Number.isNaN(stamp.getTime())
+      ? stamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : "";
+  }
+
+  // --- Safe, DOM-only markdown rendering (no innerHTML; CSP intact) ----------
+  function appendInline(parent, str) {
+    const re = /`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(str))) {
+      if (m.index > last) parent.appendChild(document.createTextNode(str.slice(last, m.index)));
+      if (m[1] !== undefined) {
+        const code = document.createElement("code");
+        code.className = "md-code";
+        code.textContent = m[1];
+        parent.appendChild(code);
+      } else if (m[2] !== undefined) {
+        const strong = document.createElement("strong");
+        strong.textContent = m[2];
+        parent.appendChild(strong);
+      } else if (m[3] !== undefined) {
+        const em = document.createElement("em");
+        em.textContent = m[3];
+        parent.appendChild(em);
+      } else if (m[4] !== undefined) {
+        const a = document.createElement("a");
+        a.href = m[5];
+        a.textContent = m[4];
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        parent.appendChild(a);
+      }
+      last = re.lastIndex;
+    }
+    if (last < str.length) parent.appendChild(document.createTextNode(str.slice(last)));
+  }
+
+  function codeBlock(code, lang) {
+    const wrap = document.createElement("div");
+    wrap.className = "code-block";
+    const head = document.createElement("div");
+    head.className = "code-head";
+    const label = document.createElement("span");
+    label.className = "code-lang";
+    label.textContent = lang || "code";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "code-copy";
+    copy.textContent = "Copy";
+    copy.addEventListener("click", () => navigator.clipboard?.writeText(code));
+    head.append(label, copy);
+    const pre = document.createElement("pre");
+    const codeEl = document.createElement("code");
+    codeEl.textContent = code;
+    pre.appendChild(codeEl);
+    wrap.append(head, pre);
+    return wrap;
+  }
+
+  function renderMarkdown(container, src) {
+    const lines = String(src).replace(/\r\n/g, "\n").split("\n");
+    let i = 0;
+    let listEl = null;
+    let listType = null;
+    const flushList = () => {
+      listEl = null;
+      listType = null;
+    };
+    while (i < lines.length) {
+      const line = lines[i];
+      const fence = line.match(/^```(\w+)?\s*$/);
+      if (fence) {
+        flushList();
+        const code = [];
+        i++;
+        while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+          code.push(lines[i]);
+          i++;
+        }
+        i++;
+        container.appendChild(codeBlock(code.join("\n"), fence[1] || ""));
+        continue;
+      }
+      if (/^\s*$/.test(line)) {
+        flushList();
+        i++;
+        continue;
+      }
+      const heading = line.match(/^(#{1,6})\s+(.*)$/);
+      if (heading) {
+        flushList();
+        const node = document.createElement(heading[1].length <= 2 ? "h3" : "h4");
+        node.className = "md-h";
+        appendInline(node, heading[2]);
+        container.appendChild(node);
+        i++;
+        continue;
+      }
+      if (/^>\s?/.test(line)) {
+        flushList();
+        const quote = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) {
+          quote.push(lines[i].replace(/^>\s?/, ""));
+          i++;
+        }
+        const bq = document.createElement("blockquote");
+        bq.className = "md-quote";
+        appendInline(bq, quote.join(" "));
+        container.appendChild(bq);
+        continue;
+      }
+      const item = line.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
+      if (item) {
+        const type = /\d+\./.test(item[2]) ? "ol" : "ul";
+        if (!listEl || listType !== type) {
+          flushList();
+          listEl = document.createElement(type);
+          listEl.className = "md-list";
+          container.appendChild(listEl);
+          listType = type;
+        }
+        const li = document.createElement("li");
+        appendInline(li, item[3]);
+        listEl.appendChild(li);
+        i++;
+        continue;
+      }
+      flushList();
+      const para = [line];
+      i++;
+      while (
+        i < lines.length &&
+        !/^\s*$/.test(lines[i]) &&
+        !/^```/.test(lines[i]) &&
+        !/^(#{1,6})\s/.test(lines[i]) &&
+        !/^>\s?/.test(lines[i]) &&
+        !/^(\s*)([-*+]|\d+\.)\s+/.test(lines[i])
+      ) {
+        para.push(lines[i]);
+        i++;
+      }
+      const p = document.createElement("p");
+      p.className = "md-p";
+      appendInline(p, para.join("\n"));
+      container.appendChild(p);
+    }
+  }
+
   function renderTranscript() {
     el.transcript.textContent = "";
     const messages = state.transcript?.messages || [];
     if (!messages.length) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = "No transcript yet. Send a prompt or run a workflow.";
+      empty.textContent = "No messages yet. Ask the room something to get started.";
       el.transcript.appendChild(empty);
       return;
     }
     for (const message of messages) {
-      const article = document.createElement("article");
-      article.className = `message ${message.status === "error" ? "error" : ""}`;
-      const meta = document.createElement("div");
-      const name = document.createElement("div");
-      name.className = "message-name";
-      name.textContent = text(message.displayName);
-      const badges = document.createElement("div");
-      badges.className = "message-meta";
-      const badgeParts = [];
-      if (message.providerId && message.providerId !== "human") {
-        badgeParts.push(providerName(message.providerId));
+      const kind = messageKind(message);
+      const row = document.createElement("article");
+      row.className = `msg msg-${kind}${message.status === "error" ? " msg-error" : ""}`;
+
+      const avatar = document.createElement("div");
+      avatar.className = "msg-avatar";
+      avatar.textContent = initialFor(message.displayName);
+      if (kind === "user") avatar.classList.add("is-user");
+      else if (kind === "conductor" || kind === "system") avatar.classList.add("is-conductor");
+      else avatar.style.background = AVATAR_PALETTE[hashIndex(message.participantId || message.displayName, AVATAR_PALETTE.length)];
+
+      const main = document.createElement("div");
+      main.className = "msg-main";
+
+      const head = document.createElement("div");
+      head.className = "msg-head";
+      const author = document.createElement("span");
+      author.className = "msg-author";
+      author.textContent = text(message.displayName);
+      const roles = (message.roleNames || []).join(", ");
+      if (roles) author.title = roles;
+      head.appendChild(author);
+      const tag = metaTag(message);
+      if (tag) {
+        const tagEl = document.createElement("span");
+        tagEl.className = "msg-tag";
+        tagEl.textContent = tag;
+        head.appendChild(tagEl);
       }
-      if ((message.roleNames || []).length) badgeParts.push(message.roleNames.join(", "));
-      badges.textContent = badgeParts.join(" · ");
-      const status = document.createElement("div");
-      status.className = "message-meta";
-      const stamp = message.createdAt ? new Date(message.createdAt) : null;
-      const time = stamp && !Number.isNaN(stamp.getTime()) ? stamp.toLocaleTimeString() : "";
-      status.textContent = [text(message.status), time].filter(Boolean).join(" · ");
-      meta.append(name, badges, status);
-      const body = document.createElement("div");
-      const content = document.createElement("div");
-      content.className = "message-content";
-      content.textContent = message.content || (message.status === "running" ? "Running..." : "");
-      body.appendChild(content);
-      if (message.diagnostics && state.showDiagnostics) {
-        const details = document.createElement("details");
-        const summary = document.createElement("summary");
-        summary.textContent = "Diagnostics";
-        const pre = document.createElement("pre");
-        pre.textContent = JSON.stringify(message.diagnostics, null, 2);
-        details.append(summary, pre);
-        body.appendChild(details);
+      const time = messageTime(message);
+      if (time) {
+        const timeEl = document.createElement("span");
+        timeEl.className = "msg-time";
+        timeEl.textContent = time;
+        head.appendChild(timeEl);
       }
-      const actions = document.createElement("div");
-      actions.className = "message-actions";
+      if (message.status && message.status !== "complete") {
+        const statusEl = document.createElement("span");
+        statusEl.className = `msg-status ${message.status}`;
+        statusEl.textContent = message.status === "running" ? "working…" : message.status;
+        head.appendChild(statusEl);
+      }
+
+      const actions = document.createElement("span");
+      actions.className = "msg-actions";
       const copy = document.createElement("button");
       copy.type = "button";
       copy.textContent = "Copy";
-      copy.addEventListener("click", () => {
-        navigator.clipboard?.writeText(message.content || "");
-      });
+      copy.addEventListener("click", () => navigator.clipboard?.writeText(message.content || ""));
       const reply = document.createElement("button");
       reply.type = "button";
       reply.textContent = "Reply";
@@ -281,9 +477,30 @@
         el.text.focus();
       });
       actions.append(copy, reply);
-      body.appendChild(actions);
-      article.append(meta, body);
-      el.transcript.appendChild(article);
+      head.appendChild(actions);
+
+      const body = document.createElement("div");
+      body.className = "msg-body";
+      if (message.content) {
+        renderMarkdown(body, message.content);
+      } else {
+        body.classList.add("msg-empty-body");
+        body.textContent = message.status === "running" ? "Working…" : "(no output)";
+      }
+
+      main.append(head, body);
+      if (message.diagnostics && state.showDiagnostics) {
+        const details = document.createElement("details");
+        details.className = "msg-diagnostics";
+        const summary = document.createElement("summary");
+        summary.textContent = "Diagnostics";
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(message.diagnostics, null, 2);
+        details.append(summary, pre);
+        main.appendChild(details);
+      }
+      row.append(avatar, main);
+      el.transcript.appendChild(row);
     }
     el.transcript.scrollTop = el.transcript.scrollHeight;
   }

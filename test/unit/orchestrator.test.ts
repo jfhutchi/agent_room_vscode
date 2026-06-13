@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseTurn, runDebate, type DebateEntry } from "../../src/core/Orchestrator";
+import {
+  parseTurn,
+  runAdversarialReview,
+  runDebate,
+  runOrchestration,
+  type DebateEntry
+} from "../../src/core/Orchestrator";
 
 test("parseTurn extracts verdict + summary and strips the trailer", () => {
   const r = parseTurn("Here is my plan.\n\n«agent-room verdict=propose; summary=Add a debounce helper»");
@@ -118,4 +124,110 @@ test("runDebate clamps a nonsensical round cap to at least one", async () => {
   });
   assert.equal(outcome.status, "consensus");
   assert.equal(outcome.rounds, 1);
+});
+
+test("runAdversarialReview: agree passes, revise/missing fails", async () => {
+  const pass = await runAdversarialReview({
+    cycle: 1,
+    history: [],
+    runTurn: async () => "No blocking flaw. «agent-room verdict=agree»"
+  });
+  assert.equal(pass?.passed, true);
+  assert.equal(pass?.entry.role, "adversary");
+
+  const fail = await runAdversarialReview({
+    cycle: 1,
+    history: [],
+    runTurn: async () => "Race condition under partition. «agent-room verdict=revise; summary=race»"
+  });
+  assert.equal(fail?.passed, false);
+  assert.equal(fail?.entry.verdict, "revise");
+
+  const missing = await runAdversarialReview({ cycle: 1, history: [], runTurn: async () => "I forgot the verdict." });
+  assert.equal(missing?.passed, false);
+});
+
+test("runOrchestration approves when the plan survives the adversary in cycle 1", async () => {
+  const emitted: string[] = [];
+  const outcome = await runOrchestration({
+    maxRounds: 4,
+    maxCycles: 3,
+    emit: (e: DebateEntry) => {
+      emitted.push(`${e.role}#${e.round}:${e.verdict}`);
+    },
+    runTurn: async ({ role }) =>
+      role === "proposer"
+        ? "Plan. «agent-room verdict=propose; summary=ship it»"
+        : role === "critic"
+          ? "Agreed. «agent-room verdict=agree»"
+          : "Survives. «agent-room verdict=agree»"
+  });
+  assert.equal(outcome.status, "approved");
+  assert.equal(outcome.cycles, 1);
+  assert.equal(outcome.planSummary, "ship it");
+  assert.deepEqual(emitted, ["proposer#1:propose", "critic#1:agree", "adversary#1:agree"]);
+});
+
+test("runOrchestration loops back to debate when the adversary finds a flaw, then approves", async () => {
+  const outcome = await runOrchestration({
+    maxRounds: 4,
+    maxCycles: 3,
+    runTurn: async ({ role, cycle }) =>
+      role === "proposer"
+        ? `Plan c${cycle}. «agent-room verdict=propose; summary=plan ${cycle}»`
+        : role === "critic"
+          ? "Agreed. «agent-room verdict=agree»"
+          : cycle === 1
+            ? "Security hole. «agent-room verdict=revise; summary=auth»"
+            : "Fixed. «agent-room verdict=agree»"
+  });
+  assert.equal(outcome.status, "approved");
+  assert.equal(outcome.cycles, 2);
+  assert.equal(outcome.planSummary, "plan 2");
+  // cycle 1 (proposer, critic, adversary) + cycle 2 (proposer, critic, adversary)
+  assert.equal(outcome.entries.length, 6);
+});
+
+test("runOrchestration reports noConsensus when the debate caps", async () => {
+  const outcome = await runOrchestration({
+    maxRounds: 2,
+    maxCycles: 3,
+    runTurn: async ({ role }) =>
+      role === "proposer"
+        ? "Plan. «agent-room verdict=propose»"
+        : role === "critic"
+          ? "Nope. «agent-room verdict=revise; summary=x»"
+          : "unused"
+  });
+  assert.equal(outcome.status, "noConsensus");
+  assert.equal(outcome.cycles, 1);
+});
+
+test("runOrchestration reports adversaryUnresolved when the attack never passes", async () => {
+  const outcome = await runOrchestration({
+    maxRounds: 3,
+    maxCycles: 2,
+    runTurn: async ({ role }) =>
+      role === "proposer"
+        ? "Plan. «agent-room verdict=propose»"
+        : role === "critic"
+          ? "Agreed. «agent-room verdict=agree»"
+          : "Still broken. «agent-room verdict=revise; summary=nope»"
+  });
+  assert.equal(outcome.status, "adversaryUnresolved");
+  assert.equal(outcome.cycles, 2);
+});
+
+test("runOrchestration honors cancellation", async () => {
+  const signal = { aborted: false };
+  const outcome = await runOrchestration({
+    maxRounds: 4,
+    maxCycles: 3,
+    signal,
+    runTurn: async ({ role }) => {
+      if (role === "proposer") signal.aborted = true;
+      return "x. «agent-room verdict=propose»";
+    }
+  });
+  assert.equal(outcome.status, "aborted");
 });

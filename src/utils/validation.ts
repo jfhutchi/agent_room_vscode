@@ -36,6 +36,7 @@ export type WebviewToExtensionMessage =
   | { type: "previewCopilotCustomAgents" }
   | { type: "openCopilotCustomAgentsFolder" }
   | { type: "checkCopilotCapabilities" }
+  | { type: "startOrchestratedBuild"; text: string }
   | { type: "createCustomRole"; name: string; description: string; instructions: string }
   | {
       type: "updateCustomRole";
@@ -97,6 +98,10 @@ export function validateWebviewMessage(raw: unknown): WebviewToExtensionMessage 
         text: raw.text as string,
         replyToMessageId: raw.replyToMessageId as string | undefined
       };
+
+    case "startOrchestratedBuild":
+      if (!isText(raw.text) || (raw.text as string).trim().length === 0) return null;
+      return { type: "startOrchestratedBuild", text: raw.text as string };
 
     case "sendToVirtualAgent":
       if (!isShortString(raw.agentId) || !isText(raw.text)) return null;

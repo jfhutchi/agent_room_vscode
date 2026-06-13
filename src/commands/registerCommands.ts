@@ -27,7 +27,8 @@ export function registerCommands(context: vscode.ExtensionContext, controller: A
     ["agentRoom.generateCopilotCustomAgents", () => controller.generateCopilotCustomAgents()],
     ["agentRoom.previewCopilotCustomAgents", () => controller.previewCopilotCustomAgents()],
     ["agentRoom.openCopilotCustomAgentsFolder", () => controller.openCopilotCustomAgentsFolder()],
-    ["agentRoom.checkCopilotCapabilities", () => controller.checkCopilotCapabilities()]
+    ["agentRoom.checkCopilotCapabilities", () => controller.checkCopilotCapabilities()],
+    ["agentRoom.startOrchestratedBuild", () => controller.startOrchestratedBuild()]
   ];
 
   for (const [id, callback] of registrations) {

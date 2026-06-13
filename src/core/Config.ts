@@ -93,6 +93,11 @@ export function getAgentRoomSettings(): AgentRoomSettings {
       blockedDomains: get(config, "webResearch.blockedDomains", []),
       searchFreshness: get(config, "webResearch.searchFreshness", "auto")
     },
+    orchestration: {
+      maxDebateRounds: get(config, "orchestration.maxDebateRounds", 6),
+      maxIntakeQuestions: get(config, "orchestration.maxIntakeQuestions", 3),
+      orchestratorProvider: get(config, "orchestration.orchestratorProvider", "claudeCodeCli")
+    },
     copilotIntegration: {
       enabled: get(config, "copilotIntegration.enabled", true),
       generateCustomAgents: get(config, "copilotIntegration.generateCustomAgents", true),

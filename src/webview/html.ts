@@ -104,6 +104,7 @@ export function getAgentRoomHtml(webview: vscode.Webview, extensionUri: vscode.U
       <textarea id="composerText" rows="4" placeholder="Ask the room..."></textarea>
       <div class="composer-actions">
         <button id="sendButton" type="button">Send</button>
+        <button id="startBuildButton" type="button">Start Build</button>
         <button id="runWorkflowButton" type="button">Run Workflow</button>
         <button id="stopButton" type="button">Stop</button>
         <button id="exportMarkdownButton" type="button">Export MD</button>

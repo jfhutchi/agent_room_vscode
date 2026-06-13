@@ -30,7 +30,14 @@ import { CodexCliProvider } from "./CodexCliProvider";
 import { Conductor, typingIndicatorFor } from "./Conductor";
 import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
 import { ProviderRegistry } from "./ProviderRegistry";
-import { RoleRegistry } from "./RoleRegistry";
+import { RoleRegistry, ROLE_IDS } from "./RoleRegistry";
+import {
+  CRITIC_VERDICT_INSTRUCTION,
+  PROPOSER_VERDICT_INSTRUCTION,
+  runDebate,
+  type DebateEntry,
+  type DebateRole
+} from "./Orchestrator";
 import { createDefaultRoomProfile, RoomProfileStore } from "./RoomProfileStore";
 import { SafetyPolicy } from "./SafetyPolicy";
 import { TranscriptStore, messageStatusFromProvider } from "./TranscriptStore";
@@ -88,6 +95,10 @@ export class AgentRoomController {
     string,
     { recommendation: ModelAdvisorRecommendation; text: string }
   >();
+  /** Active orchestrated-build session (Stage 1: intake → debate → approval). */
+  private orchestration:
+    | { phase: "intake" | "awaitingApproval"; goal: string }
+    | undefined;
   private contextChips: Record<ContextChipId, boolean> = {
     selection: true,
     currentFile: false,
@@ -545,6 +556,9 @@ export class AgentRoomController {
       case "checkCopilotCapabilities":
         await this.checkCopilotCapabilities();
         return;
+      case "startOrchestratedBuild":
+        await this.startOrchestratedBuild(message.text);
+        return;
       case "applyModelAdvisorRecommendation":
         await this.applyRecommendation(message.recommendationId);
         return;
@@ -578,9 +592,263 @@ export class AgentRoomController {
     await this.runWorkflow(pending.recommendation.workflowId, pending.text, false);
   }
 
+  /**
+   * Start an autonomous orchestrated build (Stage 1: intake → debate →
+   * consensus). Personal Mode only — the cross-provider debate needs the local
+   * Claude + Codex CLIs (docs/ORCHESTRATION_STAGE1.md).
+   */
+  async startOrchestratedBuild(goal?: string): Promise<void> {
+    if (!(await this.open())) return;
+    const mode = this.requireOperatingMode();
+    if (mode !== "personalLocal") {
+      await this.addConductorMessage(
+        `Orchestrated builds run in Personal Mode (local Claude + Codex). ${separationGuardMessage(mode)}`,
+        "error"
+      );
+      await this.hydrate();
+      return;
+    }
+    const goalText = (
+      goal ??
+      (await vscode.window.showInputBox({
+        title: "Start Orchestrated Build",
+        prompt: "What would you like the team to build or achieve?",
+        ignoreFocusOut: true
+      })) ??
+      ""
+    ).trim();
+    if (!goalText) return;
+
+    const team = new VirtualTeamRegistry(this.requireProfile().virtualAgents);
+    if (!team.agentsWithAnyRole([ROLE_IDS.planner, ROLE_IDS.architect])[0] || !team.agentsWithAnyRole([ROLE_IDS.reviewer])[0]) {
+      await this.addConductorMessage(
+        "An orchestrated build needs an enabled Planner/Architect and an enabled Reviewer. Open Room Setup to assign them.",
+        "error"
+      );
+      await this.hydrate();
+      return;
+    }
+
+    await this.ensureTranscript();
+    await this.appendUserMessage(goalText);
+    this.orchestration = { phase: "intake", goal: goalText };
+    await this.addConductorMessage(await this.generateIntakeQuestions(goalText));
+    await this.hydrate();
+  }
+
+  /** Conductor reasons through the orchestrator provider to produce intake questions. */
+  private async generateIntakeQuestions(goal: string): Promise<string> {
+    const registry = this.requireProviderRegistry();
+    const providerId = this.settings.orchestration.orchestratorProvider;
+    if (!registry.has(providerId)) {
+      return `Goal received: "${goal}". (The orchestrator provider ${providerId} is unavailable, so I'll skip clarifying questions.) Reply with anything to begin the plan debate.`;
+    }
+    const max = this.settings.orchestration.maxIntakeQuestions;
+    try {
+      const result = await registry.runTurn({
+        providerId,
+        virtualAgentId: "conductor",
+        operatingMode: this.operatingMode,
+        prompt:
+          `You are the Conductor coordinating an autonomous agent team toward this goal:\n\n"${goal}"\n\n` +
+          `Ask the user up to ${max} concise clarifying questions that would materially change the plan. ` +
+          "Output ONLY a short numbered list of questions — do not plan and do not answer them yourself. " +
+          "If the goal is already clear, reply with a single line saying so.",
+        workspaceRoot: this.workspaceRoot(),
+        safetyMode: "readOnly",
+        modelTier: "providerDefault",
+        timeoutMs: this.settings.agentTimeoutSeconds * 1000
+      });
+      const text = result.finalText.trim();
+      return text
+        ? `Before the team plans, a few questions:\n\n${text}\n\nAnswer in one message and the debate will begin.`
+        : `Goal received: "${goal}". Reply with anything to begin the plan debate.`;
+    } catch (error) {
+      return `Goal received: "${goal}". (Could not generate clarifying questions: ${
+        error instanceof Error ? error.message : String(error)
+      }.) Reply to begin the plan debate.`;
+    }
+  }
+
+  private async handleOrchestrationReply(text: string): Promise<void> {
+    const session = this.orchestration;
+    if (!session) return;
+    if (session.phase === "awaitingApproval") {
+      this.orchestration = undefined;
+      await this.addConductorMessage(
+        "Plan approved. Execution — Stage 3's parallel task breakdown and coding dev team — isn't built yet; that's the next milestone."
+      );
+      return;
+    }
+    // phase === "intake": this message holds the answers; begin the debate.
+    this.orchestration = undefined;
+    await this.runOrchestratedDebate(session.goal, text);
+  }
+
+  /** The autonomous proposer↔critic debate loop, streamed into the chat. */
+  private async runOrchestratedDebate(goal: string, intakeAnswers: string): Promise<void> {
+    const transcript = await this.ensureTranscript();
+    const profile = this.requireProfile();
+    const team = new VirtualTeamRegistry(profile.virtualAgents);
+    const proposer = team.agentsWithAnyRole([ROLE_IDS.planner, ROLE_IDS.architect])[0];
+    const critic = team.agentsWithAnyRole([ROLE_IDS.reviewer])[0];
+    if (!proposer || !critic) {
+      await this.addConductorMessage("Lost the Planner or Reviewer assignment; cannot run the debate.", "error");
+      return;
+    }
+    const registry = this.requireProviderRegistry();
+    const operatingMode = this.requireOperatingMode();
+    const runAbort = new AbortController();
+    const runGeneration = this.runGeneration;
+    this.abortController = runAbort;
+    this.isRunning = true;
+    const safety = new SafetyPolicy({
+      enableDangerousModes: this.settings.enableDangerousModes,
+      dangerousModeSelected: this.safetyMode === "dangerous",
+      dangerousModeConfirmed: false
+    });
+    const agentFor = (role: DebateRole): VirtualAgent => (role === "proposer" ? proposer : critic);
+    const concreteFor = (agent: VirtualAgent): string | undefined =>
+      resolveConcreteModel(this.settings.models, operatingMode, agent.providerId, agent.preferredModelTier ?? "providerDefault");
+
+    try {
+      await this.addConductorMessage(
+        `Starting the plan debate: ${proposer.displayName} proposes, ${critic.displayName} reviews — up to ${this.settings.orchestration.maxDebateRounds} rounds until they agree.`
+      );
+      await this.hydrate();
+
+      const outcome = await runDebate({
+        maxRounds: this.settings.orchestration.maxDebateRounds,
+        signal: runAbort.signal,
+        runTurn: async ({ role, round, history }) => {
+          const agent = agentFor(role);
+          const provider = profile.providers.find((entry) => entry.id === agent.providerId);
+          if (!provider || !registry.has(agent.providerId)) {
+            throw new Error(`${agent.displayName} has no runnable provider in this mode.`);
+          }
+          await this.panel?.post({
+            type: "runningStateChanged",
+            running: true,
+            activity: typingIndicatorFor(agent.displayName, agent.assignedRoleIds)
+          });
+          const result = await runAgentTurn({
+            providerRegistry: registry,
+            agent,
+            provider,
+            roles: this.rolesForAgent(agent),
+            participants: this.participants(),
+            transcript: this.currentMessages(),
+            latestUserMessage: this.buildDebatePrompt(goal, intakeAnswers, role, round, history),
+            context: await this.collectContext(),
+            workflowName: "Orchestrated Build",
+            stepName: role === "proposer" ? `Plan (round ${round})` : `Review (round ${round})`,
+            safetyMode: this.safetyMode,
+            safetyInstruction: safety.instructionFor(this.safetyMode),
+            operatingMode,
+            effortLevel: agent.effortLevel,
+            concreteModelName: concreteFor(agent),
+            timeoutMs: this.settings.agentTimeoutSeconds * 1000,
+            maxPromptChars: this.settings.maxPromptChars,
+            abortSignal: runAbort.signal
+          });
+          return result.finalText;
+        },
+        emit: async (entry: DebateEntry) => {
+          if (runGeneration !== this.runGeneration) return;
+          const agent = agentFor(entry.role);
+          const roles = this.rolesForAgent(agent);
+          await this.transcriptStore.appendMessage(transcript.id, {
+            participantKind: "virtualAgent",
+            participantId: agent.id,
+            displayName: agent.displayName,
+            providerId: agent.providerId,
+            operatingMode,
+            roleIds: roles.map((role) => role.id),
+            roleNames: roles.map((role) => role.name),
+            modelTier: agent.preferredModelTier ?? "providerDefault",
+            concreteModelName: concreteFor(agent),
+            effortLevel: agent.effortLevel,
+            status: "complete",
+            content: entry.text || `(${entry.verdict})`
+          });
+          await this.hydrate();
+        }
+      });
+
+      if (runAbort.signal.aborted || runGeneration !== this.runGeneration) {
+        await this.addConductorMessage("Orchestrated build stopped.");
+        return;
+      }
+      if (outcome.status === "consensus") {
+        this.orchestration = { phase: "awaitingApproval", goal };
+        await this.addConductorMessage(
+          `Consensus reached after ${outcome.rounds} round(s).\n\nAgreed plan: ${
+            outcome.planSummary ?? "see the discussion above"
+          }\n\nApprove to continue, or reply with changes.`
+        );
+        await vscode.window.showInformationMessage(
+          `Agent Room: the team agreed on a plan${outcome.planSummary ? ` — ${outcome.planSummary}` : ""}. Approve in the room to continue.`
+        );
+      } else if (outcome.status === "cap") {
+        await this.addConductorMessage(
+          `No consensus after ${outcome.rounds} rounds. ${proposer.displayName} and ${critic.displayName} still disagree — review the discussion above and decide how to proceed.`
+        );
+      }
+    } catch (error) {
+      await this.addConductorMessage(
+        `Orchestrated build failed: ${error instanceof Error ? error.message : String(error)}`,
+        "error"
+      );
+    } finally {
+      if (this.abortController === runAbort) {
+        this.abortController = undefined;
+        this.isRunning = false;
+        await this.panel?.post({ type: "runningStateChanged", running: false });
+      }
+      await this.hydrate();
+    }
+  }
+
+  private buildDebatePrompt(
+    goal: string,
+    intakeAnswers: string,
+    role: DebateRole,
+    round: number,
+    history: DebateEntry[]
+  ): string {
+    const debateSoFar = history
+      .map((entry) => `${entry.role === "proposer" ? "Plan" : "Review"} (round ${entry.round}):\n${entry.text}`)
+      .join("\n\n");
+    const roleInstruction =
+      role === "proposer"
+        ? round === 1
+          ? "Propose a concrete, ordered implementation plan for the goal. State assumptions and dependencies."
+          : "Revise your plan to address the reviewer's latest points. Note any points you reject and why."
+        : "Review the latest plan critically: concrete problems, risks, gaps, and missing requirements. If it is genuinely solid, say so plainly.";
+    const verdictInstruction = role === "proposer" ? PROPOSER_VERDICT_INSTRUCTION : CRITIC_VERDICT_INSTRUCTION;
+    return [
+      `Autonomous plan debate — goal:\n"${goal}"`,
+      intakeAnswers.trim() ? `User's answers to the clarifying questions:\n${intakeAnswers.trim()}` : "",
+      debateSoFar ? `Debate so far:\n${debateSoFar}` : "",
+      `Your task this turn:\n${roleInstruction}`,
+      verdictInstruction
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
   private async handleUserMessage(text: string, replyToMessageId?: string): Promise<void> {
     await this.ensureTranscript();
     await this.appendUserMessage(text, replyToMessageId);
+
+    // An active orchestrated build intercepts the next message as either the
+    // answers to the intake questions or a decision at the approval gate.
+    if (this.orchestration) {
+      await this.handleOrchestrationReply(text);
+      await this.hydrate();
+      return;
+    }
+
     if (this.settings.modelAdvisor.enabled) {
       const advisor = this.createAdvisor();
       const recommendation = advisor.recommend(text);

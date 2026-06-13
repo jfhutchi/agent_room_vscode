@@ -144,6 +144,10 @@
       {
         "command": "agentRoom.checkCopilotCapabilities",
         "title": "Agent Room: Check Copilot Integration Capabilities"
+      },
+      {
+        "command": "agentRoom.startOrchestratedBuild",
+        "title": "Agent Room: Start Orchestrated Build"
       }
     ],
     "chatParticipants": [
@@ -516,6 +520,21 @@
           ],
           "default": "auto",
           "description": "Freshness preference for web research."
+        },
+        "agentRoom.orchestration.maxDebateRounds": {
+          "type": "number",
+          "default": 6,
+          "description": "Hard cap on plan-debate rounds (one round = proposer + critic) before the orchestrator stops and hands the decision to you."
+        },
+        "agentRoom.orchestration.maxIntakeQuestions": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum clarifying questions the Conductor asks before starting an orchestrated build."
+        },
+        "agentRoom.orchestration.orchestratorProvider": {
+          "type": "string",
+          "default": "claudeCodeCli",
+          "description": "Provider the Conductor reasons through for intake questions and narration during orchestrated builds."
         },
         "agentRoom.copilotIntegration.enabled": {
           "type": "boolean",

@@ -644,6 +644,11 @@
     state.replyTo = null;
     renderReplyChip();
   });
+  document.getElementById("startBuildButton").addEventListener("click", () => {
+    if (!el.text.value.trim()) return;
+    post({ type: "startOrchestratedBuild", text: el.text.value });
+    el.text.value = "";
+  });
   document.getElementById("runWorkflowButton").addEventListener("click", () => {
     if (el.text.value.trim()) post({ type: "runWorkflow", workflowId: el.workflow.value, text: el.text.value });
   });

@@ -270,6 +270,14 @@ export interface ModelAdvisorSettings {
   confirmBeforeDeepReasoning: boolean;
 }
 
+/** agentRoom.orchestration.* settings (autonomous debate engine; docs/ORCHESTRATION_STAGE1.md). */
+export interface OrchestrationSettings {
+  maxDebateRounds: number;
+  maxIntakeQuestions: number;
+  /** Provider the Conductor reasons through for intake/narration. */
+  orchestratorProvider: string;
+}
+
 /** agentRoom.copilotIntegration.* settings (SPEC §15). */
 export interface CopilotIntegrationSettings {
   enabled: boolean;
@@ -330,6 +338,7 @@ export interface AgentRoomSettings {
   models: ModelTierMappings;
   webResearch: WebResearchSettings;
   copilotIntegration: CopilotIntegrationSettings;
+  orchestration: OrchestrationSettings;
 }
 
 /** Editor/workspace context captured for a turn. */

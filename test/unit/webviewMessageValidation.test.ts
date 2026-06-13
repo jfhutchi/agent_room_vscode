@@ -29,6 +29,15 @@ test("webview validation rejects unknown commands", () => {
   assert.equal(validateWebviewMessage({ type: "runShell", command: "rm -rf ." }), null);
 });
 
+test("startOrchestratedBuild requires a non-empty goal", () => {
+  assert.deepEqual(validateWebviewMessage({ type: "startOrchestratedBuild", text: "Build a parser" }), {
+    type: "startOrchestratedBuild",
+    text: "Build a parser"
+  });
+  assert.equal(validateWebviewMessage({ type: "startOrchestratedBuild", text: "   " }), null);
+  assert.equal(validateWebviewMessage({ type: "startOrchestratedBuild" }), null);
+});
+
 test("every SPEC §12 allowed message type validates with a well-formed payload", () => {
   // The canonical §12 list, with a minimal valid payload for each.
   const samples: Record<string, object> = {

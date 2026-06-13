@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 — 2026-06-12
 
 - **Operating modes:** Work / Copilot Native vs Personal / Local CLI, per-workspace,
   with a first-launch picker, guarded switching (typed confirmation Work → Personal),

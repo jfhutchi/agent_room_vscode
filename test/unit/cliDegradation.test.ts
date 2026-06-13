@@ -37,7 +37,7 @@ const prefs = { preferStreamJson: true, preferJson: true };
 
 test("Claude ladder: full capabilities give stream-json", () => {
   const built = buildClaudeArgs(prefs, fullClaudeCaps);
-  assert.deepEqual(built.args, ["-p", "--output-format", "stream-json"]);
+  assert.deepEqual(built.args, ["-p", "--output-format", "stream-json", "--verbose"]);
   assert.equal(built.format, "stream-json");
 });
 
@@ -80,18 +80,9 @@ test("Codex ladder: full capabilities give the preferred exec shape", () => {
     fullCodexCaps,
     { workspaceRoot: "/repo", safetyMode: "workspaceWriteWithApproval" }
   );
-  assert.deepEqual(built.args, [
-    "exec",
-    "--cd",
-    "/repo",
-    "--sandbox",
-    "workspace-write",
-    "--ask-for-approval",
-    "on-request",
-    "--json",
-    "-"
-  ]);
+  assert.deepEqual(built.args, ["exec", "--cd", "/repo", "--sandbox", "workspace-write", "--json", "-"]);
   assert.equal(built.json, true);
+  assert.equal(built.args.includes("--ask-for-approval"), false);
 });
 
 test("Codex ladder: unsupported --cd and --json are omitted, plain parse", () => {

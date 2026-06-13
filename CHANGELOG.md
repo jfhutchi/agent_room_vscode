@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-06-13
+
+- **Fix CLI invocation for current CLI versions** (found in live testing): drop
+  `--ask-for-approval` from `codex exec` (non-interactive; the flag was rejected), and
+  add `--verbose` to `claude -p --output-format stream-json` (the CLI requires it).
+  Orchestrated builds now run instead of erroring on the first agent turn.
+
 ## 0.2.0 — 2026-06-13
 
 - **Autonomous orchestration.** "Start Orchestrated Build" runs intake → debate →

@@ -47,7 +47,8 @@ export function buildClaudeArgs(
 
   let format: ClaudeOutputFormat = "plain";
   if (options.preferStreamJson && canStreamJson) {
-    args.push("--output-format", "stream-json");
+    // `claude -p --output-format stream-json` requires --verbose (the CLI errors otherwise).
+    args.push("--output-format", "stream-json", "--verbose");
     format = "stream-json";
   } else if ((options.preferJson || options.preferStreamJson) && canJson) {
     args.push("--output-format", "json");

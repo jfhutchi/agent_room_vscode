@@ -33,7 +33,8 @@ export interface BuiltCodexArgs {
 
 /**
  * Degradation ladder (SPEC §8). Preferred shape:
- *   codex exec --cd <root> --sandbox <mode> --ask-for-approval <policy> --json -
+ *   codex exec --cd <root> --sandbox <mode> --json -
+ * (codex exec is non-interactive and has no --ask-for-approval flag.)
  * Unsupported flags (per `codex --help` capabilities) are omitted: without
  * --cd the runner's cwd carries the workspace; without --json the plain text
  * output is parsed instead. With no capability information yet, the full
@@ -65,9 +66,8 @@ export function buildCodexArgs(
   if (supports(capabilities?.sandbox)) {
     args.push("--sandbox", safety.codexSandboxFor(invocation.safetyMode, options.sandbox));
   }
-  if (supports(capabilities?.askForApproval)) {
-    args.push("--ask-for-approval", options.approval);
-  }
+  // `codex exec` is non-interactive and rejects --ask-for-approval; approval
+  // policy doesn't apply to exec, so it is never passed.
   let json = false;
   if (options.useJson) {
     if (supports(capabilities?.jsonl)) {

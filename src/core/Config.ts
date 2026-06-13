@@ -81,6 +81,15 @@ export function getAgentRoomSettings(): AgentRoomSettings {
       allowedDomains: get(config, "webResearch.allowedDomains", []),
       blockedDomains: get(config, "webResearch.blockedDomains", []),
       searchFreshness: get(config, "webResearch.searchFreshness", "auto")
+    },
+    copilotIntegration: {
+      enabled: get(config, "copilotIntegration.enabled", true),
+      generateCustomAgents: get(config, "copilotIntegration.generateCustomAgents", true),
+      customAgentsDirectory: get(config, "copilotIntegration.customAgentsDirectory", ".github/agents"),
+      registerChatParticipant: get(config, "copilotIntegration.registerChatParticipant", false),
+      enableDirectAgentSessions: get(config, "copilotIntegration.enableDirectAgentSessions", false),
+      requirePublicApisOnly: get(config, "copilotIntegration.requirePublicApisOnly", true),
+      neverScrapeCopilotUi: get(config, "copilotIntegration.neverScrapeCopilotUi", true)
     }
   };
 }

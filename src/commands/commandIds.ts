@@ -18,7 +18,11 @@ export const COMMAND_IDS = [
   "agentRoom.runFullBuildCycleOnCurrentFile",
   "agentRoom.exportTranscript",
   "agentRoom.clearTranscript",
-  "agentRoom.openSettings"
+  "agentRoom.openSettings",
+  "agentRoom.generateCopilotCustomAgents",
+  "agentRoom.previewCopilotCustomAgents",
+  "agentRoom.openCopilotCustomAgentsFolder",
+  "agentRoom.checkCopilotCapabilities"
 ] as const;
 
 export type AgentRoomCommandId = (typeof COMMAND_IDS)[number];

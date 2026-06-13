@@ -124,6 +124,22 @@
       {
         "command": "agentRoom.openSettings",
         "title": "Agent Room: Open Settings"
+      },
+      {
+        "command": "agentRoom.generateCopilotCustomAgents",
+        "title": "Agent Room: Generate Copilot Custom Agents"
+      },
+      {
+        "command": "agentRoom.previewCopilotCustomAgents",
+        "title": "Agent Room: Preview Copilot Custom Agents"
+      },
+      {
+        "command": "agentRoom.openCopilotCustomAgentsFolder",
+        "title": "Agent Room: Open Copilot Custom Agents Folder"
+      },
+      {
+        "command": "agentRoom.checkCopilotCapabilities",
+        "title": "Agent Room: Check Copilot Integration Capabilities"
       }
     ],
     "configuration": {
@@ -452,6 +468,41 @@
           ],
           "default": "auto",
           "description": "Freshness preference for web research."
+        },
+        "agentRoom.copilotIntegration.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Copilot integration features (custom agent generation, capability checks)."
+        },
+        "agentRoom.copilotIntegration.generateCustomAgents": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow generating Copilot custom agent files for the Agent Room virtual team."
+        },
+        "agentRoom.copilotIntegration.customAgentsDirectory": {
+          "type": "string",
+          "default": ".github/agents",
+          "description": "Workspace-relative directory where Copilot custom agent files are generated."
+        },
+        "agentRoom.copilotIntegration.registerChatParticipant": {
+          "type": "boolean",
+          "default": false,
+          "description": "Register the @agent-room chat participant (only takes effect once the public Chat Participant API is verified)."
+        },
+        "agentRoom.copilotIntegration.enableDirectAgentSessions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reserved for direct Copilot Agent Session orchestration. Stays inert unless public APIs verifiably support it; Agent Room never uses private APIs."
+        },
+        "agentRoom.copilotIntegration.requirePublicApisOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only use official public VS Code / GitHub APIs for Copilot integration."
+        },
+        "agentRoom.copilotIntegration.neverScrapeCopilotUi": {
+          "type": "boolean",
+          "default": true,
+          "description": "Never scrape or automate the Copilot UI. This safety behavior is always on; the setting is informational."
         }
       }
     }

@@ -14,6 +14,17 @@ test("webview validation accepts known commands", () => {
   );
 });
 
+test("webview validation accepts the Copilot custom agent messages", () => {
+  for (const type of [
+    "generateCopilotCustomAgents",
+    "previewCopilotCustomAgents",
+    "openCopilotCustomAgentsFolder",
+    "checkCopilotCapabilities"
+  ]) {
+    assert.deepEqual(validateWebviewMessage({ type }), { type });
+  }
+});
+
 test("webview validation rejects unknown commands", () => {
   assert.equal(validateWebviewMessage({ type: "runShell", command: "rm -rf ." }), null);
 });

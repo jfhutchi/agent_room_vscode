@@ -244,6 +244,17 @@ export interface ModelAdvisorSettings {
   confirmBeforeDeepReasoning: boolean;
 }
 
+/** agentRoom.copilotIntegration.* settings (SPEC §15). */
+export interface CopilotIntegrationSettings {
+  enabled: boolean;
+  generateCustomAgents: boolean;
+  customAgentsDirectory: string;
+  registerChatParticipant: boolean;
+  enableDirectAgentSessions: boolean;
+  requirePublicApisOnly: boolean;
+  neverScrapeCopilotUi: boolean;
+}
+
 export interface WebResearchSettings {
   enabled: boolean;
   provider: string;
@@ -292,6 +303,7 @@ export interface AgentRoomSettings {
   modelAdvisor: ModelAdvisorSettings;
   models: ModelTierMappings;
   webResearch: WebResearchSettings;
+  copilotIntegration: CopilotIntegrationSettings;
 }
 
 /** Editor/workspace context captured for a turn. */

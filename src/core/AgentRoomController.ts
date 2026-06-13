@@ -6,6 +6,11 @@ import { WebviewToExtensionMessage } from "../utils/validation";
 import { Logger } from "../utils/logging";
 import { getAgentRoomSettings } from "./Config";
 import { ClaudeCodeProvider } from "./ClaudeCodeProvider";
+import {
+  CopilotCustomAgentGenerator,
+  type CustomAgentSyncPlan,
+  type CustomAgentSyncResult
+} from "./CopilotCustomAgentGenerator";
 import { CodexCliProvider } from "./CodexCliProvider";
 import { Conductor } from "./Conductor";
 import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
@@ -32,6 +37,7 @@ import { collectWorkspaceContext } from "./WorkspaceContext";
 import { runAgentTurn } from "./AgentRunner";
 import { checkProviderHealth } from "./HealthCheck";
 import {
+  COPILOT_AGENT_SESSION_LIMITATION,
   FIRST_LAUNCH_MODE_PICKER_ITEMS,
   OperatingModeManager,
   SWITCH_MODE_PICKER_ITEMS,
@@ -312,6 +318,86 @@ export class AgentRoomController {
     await this.hydrate();
   }
 
+  /** Preview the §7 custom agent files without writing anything. */
+  async previewCopilotCustomAgents(): Promise<void> {
+    if (!(await this.open())) return;
+    const generator = await this.createCustomAgentGenerator();
+    if (!generator) return;
+    const plan = await generator.plan();
+    for (const entry of plan.entries) {
+      const document = await vscode.workspace.openTextDocument({
+        language: "markdown",
+        content: entry.file.content
+      });
+      await vscode.window.showTextDocument(document, { preview: false });
+    }
+    await vscode.window.showInformationMessage(this.describeSyncPlan(plan));
+  }
+
+  /** Generate/update the §7 custom agent files. Never overwrites user edits without confirmation. */
+  async generateCopilotCustomAgents(): Promise<void> {
+    if (!(await this.open())) return;
+    if (
+      !this.settings.copilotIntegration.enabled ||
+      !this.settings.copilotIntegration.generateCustomAgents
+    ) {
+      await vscode.window.showWarningMessage(
+        "Copilot custom agent generation is disabled by your agentRoom.copilotIntegration settings."
+      );
+      return;
+    }
+    const generator = await this.createCustomAgentGenerator();
+    if (!generator) return;
+    const plan = await generator.plan();
+
+    let overwriteModified = false;
+    const modified = plan.entries
+      .filter((entry) => entry.action === "skipModified")
+      .map((entry) => entry.file.fileName);
+    if (modified.length > 0) {
+      const choice = await vscode.window.showWarningMessage(
+        `These custom agent files have been edited by hand: ${modified.join(", ")}. ` +
+          "Overwrite them with freshly generated content, or keep your edits?",
+        { modal: true },
+        "Overwrite Edited Files",
+        "Keep My Edits"
+      );
+      if (choice === undefined) return;
+      overwriteModified = choice === "Overwrite Edited Files";
+    }
+
+    const result = await generator.apply(plan, { overwriteModified });
+    await this.addConductorMessage(this.describeSyncResult(plan, result));
+    await this.hydrate();
+  }
+
+  async openCopilotCustomAgentsFolder(): Promise<void> {
+    const root = this.workspaceRoot();
+    if (!root) {
+      await vscode.window.showWarningMessage(
+        "Open a workspace folder to use Copilot custom agents."
+      );
+      return;
+    }
+    const directory = path.isAbsolute(this.settings.copilotIntegration.customAgentsDirectory)
+      ? this.settings.copilotIntegration.customAgentsDirectory
+      : path.join(root, this.settings.copilotIntegration.customAgentsDirectory);
+    await fs.mkdir(directory, { recursive: true });
+    await vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(directory));
+  }
+
+  /**
+   * Honest stub until Phase 5 lands real capability detection: reports what
+   * works today (custom agent generation) and the canonical §3.2 limitation
+   * for direct session orchestration. No fake capability claims.
+   */
+  async checkCopilotCapabilities(): Promise<void> {
+    await vscode.window.showInformationMessage(
+      "Agent Room can generate Copilot custom agent files today. Full Copilot capability " +
+        `detection arrives in a later phase. ${COPILOT_AGENT_SESSION_LIMITATION}`
+    );
+  }
+
   private async handleWebviewMessage(message: WebviewToExtensionMessage): Promise<void> {
     switch (message.type) {
       case "ready":
@@ -374,6 +460,18 @@ export class AgentRoomController {
         return;
       case "deleteCustomRole":
         await this.deleteCustomRole(message.roleId);
+        return;
+      case "generateCopilotCustomAgents":
+        await this.generateCopilotCustomAgents();
+        return;
+      case "previewCopilotCustomAgents":
+        await this.previewCopilotCustomAgents();
+        return;
+      case "openCopilotCustomAgentsFolder":
+        await this.openCopilotCustomAgentsFolder();
+        return;
+      case "checkCopilotCapabilities":
+        await this.checkCopilotCapabilities();
         return;
       case "applyModelAdvisorRecommendation":
       case "ignoreModelAdvisorRecommendation":
@@ -781,6 +879,53 @@ export class AgentRoomController {
         secretReader: this.context.secrets
       })
     ], operatingMode);
+  }
+
+  private async createCustomAgentGenerator(): Promise<CopilotCustomAgentGenerator | undefined> {
+    const root = this.workspaceRoot();
+    if (!root) {
+      await vscode.window.showWarningMessage(
+        "Open a workspace folder to generate Copilot custom agents."
+      );
+      return undefined;
+    }
+    const profile = this.requireProfile();
+    return new CopilotCustomAgentGenerator({
+      workspaceRoot: root,
+      customAgentsDirectory: this.settings.copilotIntegration.customAgentsDirectory,
+      virtualAgents: profile.virtualAgents,
+      roles: profile.roles
+    });
+  }
+
+  private describeSyncPlan(plan: CustomAgentSyncPlan): string {
+    const count = (action: string) =>
+      plan.entries.filter((entry) => entry.action === action).length;
+    const parts = [
+      `Copilot custom agent preview for ${plan.directory}:`,
+      `${count("create")} new, ${count("update")} to update, ${count("skipUnchanged")} unchanged, ` +
+        `${count("skipModified")} edited by hand (kept unless you confirm overwriting).`
+    ];
+    if (plan.missingAgents.length > 0) {
+      parts.push(`No file generated for missing team members: ${plan.missingAgents.join(", ")}.`);
+    }
+    return parts.join(" ");
+  }
+
+  private describeSyncResult(plan: CustomAgentSyncPlan, result: CustomAgentSyncResult): string {
+    const parts = [`Copilot custom agents synced to ${plan.directory}.`];
+    if (result.written.length > 0) parts.push(`Written: ${result.written.join(", ")}.`);
+    if (result.overwrittenModified.length > 0) {
+      parts.push(`Overwritten after confirmation: ${result.overwrittenModified.join(", ")}.`);
+    }
+    if (result.skippedModified.length > 0) {
+      parts.push(`Kept your edited files untouched: ${result.skippedModified.join(", ")}.`);
+    }
+    if (result.unchanged.length > 0) parts.push(`Already up to date: ${result.unchanged.join(", ")}.`);
+    if (plan.missingAgents.length > 0) {
+      parts.push(`No file generated for missing team members: ${plan.missingAgents.join(", ")}.`);
+    }
+    return parts.join(" ");
   }
 
   private createWorkflowRunner(): WorkflowRunner {

@@ -23,7 +23,11 @@ export function registerCommands(context: vscode.ExtensionContext, controller: A
     ["agentRoom.runFullBuildCycleOnCurrentFile", () => controller.runWorkflowOnCurrentFile("fullBuildCycle")],
     ["agentRoom.exportTranscript", () => controller.exportTranscript("markdown")],
     ["agentRoom.clearTranscript", () => controller.clearTranscript()],
-    ["agentRoom.openSettings", () => vscode.commands.executeCommand("workbench.action.openSettings", "agentRoom")]
+    ["agentRoom.openSettings", () => vscode.commands.executeCommand("workbench.action.openSettings", "agentRoom")],
+    ["agentRoom.generateCopilotCustomAgents", () => controller.generateCopilotCustomAgents()],
+    ["agentRoom.previewCopilotCustomAgents", () => controller.previewCopilotCustomAgents()],
+    ["agentRoom.openCopilotCustomAgentsFolder", () => controller.openCopilotCustomAgentsFolder()],
+    ["agentRoom.checkCopilotCapabilities", () => controller.checkCopilotCapabilities()]
   ];
 
   for (const [id, callback] of registrations) {

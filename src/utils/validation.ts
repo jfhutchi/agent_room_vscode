@@ -32,6 +32,10 @@ export type WebviewToExtensionMessage =
   | { type: "restoreDefaultProfile" }
   | { type: "exportRoomProfile" }
   | { type: "importRoomProfile" }
+  | { type: "generateCopilotCustomAgents" }
+  | { type: "previewCopilotCustomAgents" }
+  | { type: "openCopilotCustomAgentsFolder" }
+  | { type: "checkCopilotCapabilities" }
   | { type: "createCustomRole"; name: string; description: string; instructions: string }
   | {
       type: "updateCustomRole";
@@ -79,6 +83,10 @@ export function validateWebviewMessage(raw: unknown): WebviewToExtensionMessage 
     case "restoreDefaultProfile":
     case "exportRoomProfile":
     case "importRoomProfile":
+    case "generateCopilotCustomAgents":
+    case "previewCopilotCustomAgents":
+    case "openCopilotCustomAgentsFolder":
+    case "checkCopilotCapabilities":
       return { type: raw.type };
 
     case "sendMessage":

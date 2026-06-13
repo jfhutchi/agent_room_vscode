@@ -14,7 +14,7 @@ export interface AgentRoomDirs {
   cache: string;
 }
 
-export function agentRoomDirs(workspaceRoot: string): AgentRoomDirs {
+function agentRoomDirs(workspaceRoot: string): AgentRoomDirs {
   const root = path.join(workspaceRoot, ".agent-room");
   return {
     root,

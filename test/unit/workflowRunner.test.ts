@@ -168,3 +168,17 @@ test("Personal Mode default team passes mode validation for built-in workflows",
   assert.equal(validation.blocked, false);
   assert.equal(validation.errors.length, 0);
 });
+
+test("Copilot sync and mode-setup workflows are conductor-driven and valid in both modes", () => {
+  for (const mode of ["personalLocal", "workCopilotNative"] as const) {
+    const team = new VirtualTeamRegistry(defaultVirtualAgents(mode));
+    for (const id of [WORKFLOW_IDS.copilotCustomAgentSync, WORKFLOW_IDS.modeSetupProviderCheck]) {
+      const validation = runner(team, mode).validateWorkflow(id, "readOnly");
+      assert.equal(validation.blocked, false);
+      assert.equal(
+        validation.plan.steps.every((step) => step.step.speaker === "conductor"),
+        true
+      );
+    }
+  }
+});

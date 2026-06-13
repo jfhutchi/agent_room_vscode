@@ -15,9 +15,15 @@ import {
   COPILOT_CHAT_EXTENSION_ID,
   COPILOT_EXTENSION_ID,
   describeCopilotCapabilities,
-  detectCopilotCapabilities
+  detectCopilotCapabilities,
+  type CopilotIntegrationCapabilities
 } from "./CopilotIntegration";
 import { CopilotNativeProvider } from "./CopilotNativeProvider";
+import { CopilotCustomAgentProvider } from "./CopilotCustomAgentProvider";
+import { CopilotAgentSessionProvider } from "./CopilotAgentSessionProvider";
+import { providerHealthSummary } from "./ProviderHealth";
+import type { ChatParticipantStatus } from "./ChatParticipant";
+import type { ProviderHealth as ProviderHealthInfo } from "./ProviderTypes";
 import { CodexCliProvider } from "./CodexCliProvider";
 import { Conductor } from "./Conductor";
 import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
@@ -37,7 +43,7 @@ import {
   VirtualAgent,
 } from "./Types";
 import { VirtualTeamRegistry } from "./VirtualTeamRegistry";
-import { WorkflowRegistry } from "./WorkflowRegistry";
+import { WORKFLOW_IDS, WorkflowRegistry } from "./WorkflowRegistry";
 import { ModelAdvisor } from "./ModelAdvisor";
 import { WorkflowRunner } from "./WorkflowRunner";
 import { collectWorkspaceContext } from "./WorkspaceContext";
@@ -398,13 +404,7 @@ export class AgentRoomController {
    * agent-session flags are hard false in CopilotIntegration.ts.
    */
   async checkCopilotCapabilities(): Promise<void> {
-    const capabilities = detectCopilotCapabilities({
-      copilotExtensionDetected: vscode.extensions.getExtension(COPILOT_EXTENSION_ID) !== undefined,
-      copilotChatDetected: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
-      chatParticipantApiAvailable: typeof vscode.chat?.createChatParticipant === "function",
-      languageModelApiAvailable: typeof vscode.lm?.selectChatModels === "function",
-      workspaceOpen: this.workspaceRoot() !== undefined
-    });
+    const capabilities = this.detectCapabilities();
     await this.panel?.post({ type: "copilotCapabilitiesUpdated", capabilities });
     const summary = describeCopilotCapabilities(capabilities);
     if (this.panel && this.operatingMode) {
@@ -413,6 +413,54 @@ export class AgentRoomController {
     } else {
       await vscode.window.showInformationMessage(summary);
     }
+  }
+
+  private detectCapabilities(): CopilotIntegrationCapabilities {
+    return detectCopilotCapabilities({
+      copilotExtensionDetected: vscode.extensions.getExtension(COPILOT_EXTENSION_ID) !== undefined,
+      copilotChatDetected: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
+      chatParticipantApiAvailable: typeof vscode.chat?.createChatParticipant === "function",
+      languageModelApiAvailable: typeof vscode.lm?.selectChatModels === "function",
+      workspaceOpen: this.workspaceRoot() !== undefined
+    });
+  }
+
+  /** Current state + workflow recommendation for the @agent-room participant. */
+  chatParticipantStatus(prompt: string): ChatParticipantStatus {
+    if (!this.operatingMode || !this.profile) return {};
+    const status: ChatParticipantStatus = {
+      modeTitle: modeTitle(this.operatingMode),
+      modeDescription: modeDescription(this.operatingMode)
+    };
+    if (prompt.trim() && this.settings.modelAdvisor.enabled) {
+      status.recommendationText = new Conductor().recommendationText(
+        this.createAdvisor().recommend(prompt)
+      );
+    }
+    return status;
+  }
+
+  /** "Mode Setup / Provider Check" workflow: honest mode + health + capability report. */
+  private async runModeSetupProviderCheck(): Promise<void> {
+    const mode = this.requireOperatingMode();
+    this.health = await checkProviderHealth(this.requireProviderRegistry());
+    await this.panel?.post({ type: "healthUpdated", health: this.health });
+
+    const profile = this.requireProfile();
+    const lines = [`${modeTitle(mode)} — ${modeDescription(mode)}`];
+    for (const health of Object.values(this.health) as ProviderHealthInfo[]) {
+      const providerProfile = profile.providers.find((entry) => entry.id === health.providerId);
+      lines.push(providerHealthSummary(health, providerProfile?.enabled ?? true));
+      for (const warning of health.warnings) lines.push(`  ${warning}`);
+    }
+    if (mode === "workCopilotNative") {
+      const capabilities = this.detectCapabilities();
+      await this.panel?.post({ type: "copilotCapabilitiesUpdated", capabilities });
+      lines.push(describeCopilotCapabilities(capabilities));
+      lines.push(...capabilities.limitations);
+    }
+    await this.addConductorMessage(lines.join("\n"));
+    await this.hydrate();
   }
 
   private async handleWebviewMessage(message: WebviewToExtensionMessage): Promise<void> {
@@ -527,6 +575,16 @@ export class AgentRoomController {
   private async runWorkflow(workflowId: string, text: string, appendUser = true): Promise<void> {
     await this.ensureTranscript();
     if (appendUser) await this.appendUserMessage(text);
+    // These two built-ins are performed by the extension itself rather than
+    // spoken by an agent (SPEC §10).
+    if (workflowId === WORKFLOW_IDS.copilotCustomAgentSync) {
+      await this.generateCopilotCustomAgents();
+      return;
+    }
+    if (workflowId === WORKFLOW_IDS.modeSetupProviderCheck) {
+      await this.runModeSetupProviderCheck();
+      return;
+    }
     const runner = this.createWorkflowRunner();
     const validation = runner.validateWorkflow(workflowId, this.safetyMode);
     if (validation.blocked) {
@@ -872,7 +930,9 @@ export class AgentRoomController {
     if (operatingMode === "workCopilotNative") {
       // SPEC §3.4: in Work Mode the personal providers (claudeCodeCli,
       // codexCli, openAiWebSearch) are never constructed or registered.
-      // copilotNative runs through the public Language Model API only.
+      // copilotNative runs through the public Language Model API only;
+      // copilotCustomAgent represents the generated files; copilotAgentSession
+      // is the permanently disabled capability-gated scaffold (§7 Level 3).
       return new ProviderRegistry([
         new CopilotNativeProvider({
           selectChatModels: (selector) => vscode.lm.selectChatModels(selector),
@@ -885,7 +945,12 @@ export class AgentRoomController {
               dispose: () => source.dispose()
             };
           }
-        })
+        }),
+        new CopilotCustomAgentProvider({
+          workspaceRoot: this.workspaceRoot(),
+          customAgentsDirectory: this.settings.copilotIntegration.customAgentsDirectory
+        }),
+        new CopilotAgentSessionProvider()
       ], operatingMode);
     }
     return new ProviderRegistry([

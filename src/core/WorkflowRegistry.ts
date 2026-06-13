@@ -21,7 +21,9 @@ export const WORKFLOW_IDS = {
   roundtable: "roundtable",
   adversarialReview: "adversarialReview",
   documentationPass: "documentationPass",
-  claimVerification: "claimVerification"
+  claimVerification: "claimVerification",
+  copilotCustomAgentSync: "copilotCustomAgentSync",
+  modeSetupProviderCheck: "modeSetupProviderCheck"
 } as const;
 
 function step(partial: Partial<WorkflowStep> & Pick<WorkflowStep, "id" | "name">): WorkflowStep {
@@ -481,6 +483,34 @@ export function builtInWorkflows(): WorkflowDefinition[] {
           expectedOutput: "Verdict (Confirmed / Contradicted / Unclear) with source links."
         }),
         conductorSummary("summary", "Report the verdict and sources.")
+      ]
+    },
+    {
+      id: WORKFLOW_IDS.copilotCustomAgentSync,
+      name: "Copilot Custom Agent Sync",
+      description:
+        "Regenerates the Copilot custom agent files from the current team. User-edited files are never overwritten without confirmation.",
+      isBuiltIn: true,
+      // The extension performs the sync itself; the controller intercepts
+      // this workflow id, so there is no agent-spoken step.
+      steps: [
+        conductorSummary(
+          "sync",
+          "Generate or update the Copilot custom agent files and report exactly what was written, kept, and skipped."
+        )
+      ]
+    },
+    {
+      id: WORKFLOW_IDS.modeSetupProviderCheck,
+      name: "Mode Setup / Provider Check",
+      description:
+        "Reports the current operating mode, provider health, and (in Work Mode) Copilot integration capabilities.",
+      isBuiltIn: true,
+      steps: [
+        conductorSummary(
+          "check",
+          "Report the operating mode, each provider's health, and honest Copilot capability limitations."
+        )
       ]
     }
   ];

@@ -322,28 +322,6 @@ export interface RoomContextSnapshot {
 
 export type ContextChipId = "selection" | "currentFile" | "gitStatus";
 
-export interface AgentActivity {
-  agentId: string;
-  displayName: string;
-  /** e.g. "planning", "coding", "reviewing", "researching", "summarizing" */
-  activity: string;
-}
-
-export interface PresenceEntry {
-  agentId: string;
-  displayName: string;
-  providerId: ProviderId;
-  state:
-    | "available"
-    | "running"
-    | "waiting"
-    | "error"
-    | "missingCli"
-    | "disabled"
-    | "needsConfiguration";
-  detail?: string;
-}
-
 let counter = 0;
 
 /** Sortable, collision-resistant id without external dependencies. */

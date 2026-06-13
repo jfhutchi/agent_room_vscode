@@ -34,6 +34,14 @@ export function defaultProviders(mode: OperatingMode = DEFAULT_OPERATING_MODE): 
         kind: "copilot",
         enabled: true
       },
+      {
+        // Capability-gated scaffold (SPEC §7 Level 3) — disabled until public
+        // APIs verifiably support direct session orchestration.
+        id: "copilotAgentSession",
+        displayName: "Copilot Agent Session",
+        kind: "copilot",
+        enabled: false
+      },
       { id: "human", displayName: "Human", kind: "human", enabled: true },
       { id: "internalConductor", displayName: "Conductor", kind: "internal", enabled: true }
     ];

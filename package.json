@@ -142,6 +142,15 @@
         "title": "Agent Room: Check Copilot Integration Capabilities"
       }
     ],
+    "chatParticipants": [
+      {
+        "id": "agent-room",
+        "name": "agent-room",
+        "fullName": "Agent Room",
+        "description": "Explain Agent Room state, recommend workflows, and generate Copilot custom agents.",
+        "isSticky": false
+      }
+    ],
     "configuration": {
       "title": "Agent Room",
       "properties": {

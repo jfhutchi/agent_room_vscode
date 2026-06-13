@@ -99,3 +99,20 @@ locking the user out of the extension.
 **Why:** The keys must exist per §15 and dead settings would be dishonest; this is
 the minimal reasonable reading. The both-disabled fallback avoids a configuration
 that bricks the room.
+
+## 8. Chat participant handler always attached; behaviors gated by the setting (Phase 5b)
+
+**What:** SPEC §15 reads `agentRoom.copilotIntegration.registerChatParticipant`
+(default false) as gating participant *registration*. Phase 5b instead attaches the
+`@agent-room` handler whenever the public Chat Participant API exists, and gates the
+§7 Level 2 *behaviors* at request time: with the setting off, the participant replies
+only with a one-line notice explaining how to enable it (no state, no recommendations,
+no buttons).
+
+**Why:** A chat participant must be declared in `package.json`
+(`contributes.chatParticipants`), which makes `@agent-room` visible in the chat UI
+regardless of runtime registration. With the literal reading, every default-settings
+user would see `@agent-room` in the picker and get a VS Code "participant not
+registered" error when invoking it. Attaching a handler that politely says "disabled"
+preserves the setting's intent (no Level 2 behavior unless opted in) without shipping
+a broken-looking default experience.

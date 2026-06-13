@@ -50,8 +50,3 @@ export class Logger {
     this.sink.appendLine(`[${stamp}] [${level}] ${redactText(message)}`);
   }
 }
-
-/** No-op logger for tests and headless code paths. */
-export function nullLogger(): Logger {
-  return new Logger({ appendLine: () => undefined });
-}

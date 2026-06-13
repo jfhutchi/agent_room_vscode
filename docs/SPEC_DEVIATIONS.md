@@ -61,9 +61,12 @@ defaults, `webResearch` domain preferences, and `modelAdvisor.showReasoning`.
 
 **Why:** Working, user-visible functionality; removing them would regress the existing
 Personal-Mode experience. The spec's missing mode/firstLaunch/copilotIntegration/work
-model keys land in their respective phases. (The `agentRoom.models.claude.*` →
-`agentRoom.models.personal.claude.*` rename is planned for Phase 8 and will be logged
-when it happens.)
+model keys land in their respective phases. (Update, Phase 8: the
+`agentRoom.models.claude.*` / `codex.*` / `openAiWebSearch.research` keys were renamed
+to the spec's `agentRoom.models.personal.*` shape and the seven
+`agentRoom.models.work.*` keys were added, removing that part of this deviation. Old
+key values are not migrated — the keys were unconsumed before Phase 8, so nothing
+user-visible regresses.)
 
 ## 5. `Conductor` is intentionally skeletal (pre-existing; recorded Phase 1)
 

@@ -1,7 +1,8 @@
 import { buildPrompt } from "./PromptBuilder";
 import { ProviderRegistry } from "./ProviderRegistry";
-import { ProviderProfile, RoleDefinition, SafetyMode, VirtualAgent } from "./Types";
+import { EffortLevel, ProviderProfile, RoleDefinition, SafetyMode, VirtualAgent } from "./Types";
 import { AgentRoomMessage, RoomContextSnapshot } from "./Types";
+import type { OperatingMode } from "./OperatingMode";
 
 export interface AgentRunnerInput {
   providerRegistry: ProviderRegistry;
@@ -18,6 +19,11 @@ export interface AgentRunnerInput {
   expectedOutput?: string;
   safetyMode: SafetyMode;
   safetyInstruction: string;
+  operatingMode?: OperatingMode;
+  effortLevel?: EffortLevel;
+  /** Resolved from the user's tier mappings; undefined = provider default. */
+  concreteModelName?: string;
+  providerWarnings?: string[];
   timeoutMs: number;
   maxPromptChars: number;
   abortSignal?: AbortSignal;
@@ -36,6 +42,9 @@ export async function runAgentTurn(input: AgentRunnerInput) {
     safetyMode: input.safetyMode,
     safetyInstruction: input.safetyInstruction,
     modelTier: input.agent.preferredModelTier ?? "providerDefault",
+    operatingMode: input.operatingMode,
+    effortLevel: input.effortLevel,
+    providerWarnings: input.providerWarnings,
     contextChips: input.context.contextChips,
     transcript: input.transcript,
     latestUserMessage: input.latestUserMessage,
@@ -57,10 +66,13 @@ export async function runAgentTurn(input: AgentRunnerInput) {
   return input.providerRegistry.runTurn({
     providerId: input.provider.id,
     virtualAgentId: input.agent.id,
+    operatingMode: input.operatingMode,
     prompt: built.prompt,
     workspaceRoot: input.context.workspacePath,
     safetyMode: input.safetyMode,
     modelTier: input.agent.preferredModelTier ?? "providerDefault",
+    effortLevel: input.effortLevel,
+    concreteModelName: input.concreteModelName,
     timeoutMs: input.timeoutMs,
     abortSignal: input.abortSignal,
     context: { truncationNotes: built.truncationNotes }

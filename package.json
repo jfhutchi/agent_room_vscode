@@ -363,47 +363,82 @@
           "default": true,
           "description": "Ask for confirmation before running deep-reasoning model tiers."
         },
-        "agentRoom.models.claude.fast": {
+        "agentRoom.models.work.providerDefault": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the providerDefault tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.work.fast": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the fast tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.work.balanced": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the balanced tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.work.deepReasoning": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the deepReasoning tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.work.coding": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the coding tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.work.review": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the review tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.work.testing": {
+          "type": "string",
+          "default": "",
+          "description": "Concrete company-exposed model for the testing tier in Work Mode. Empty = provider default."
+        },
+        "agentRoom.models.personal.claude.fast": {
           "type": "string",
           "default": "",
           "description": "Concrete Claude model for the fast tier. Empty = provider default."
         },
-        "agentRoom.models.claude.balanced": {
+        "agentRoom.models.personal.claude.balanced": {
           "type": "string",
           "default": "",
           "description": "Concrete Claude model for the balanced tier. Empty = provider default."
         },
-        "agentRoom.models.claude.deepReasoning": {
+        "agentRoom.models.personal.claude.deepReasoning": {
           "type": "string",
           "default": "",
           "description": "Concrete Claude model for the deepReasoning tier. Empty = provider default."
         },
-        "agentRoom.models.claude.coding": {
+        "agentRoom.models.personal.claude.coding": {
           "type": "string",
           "default": "",
           "description": "Concrete Claude model for the coding tier. Empty = provider default."
         },
-        "agentRoom.models.codex.fast": {
+        "agentRoom.models.personal.codex.fast": {
           "type": "string",
           "default": "",
           "description": "Concrete Codex model for the fast tier. Empty = provider default."
         },
-        "agentRoom.models.codex.balanced": {
+        "agentRoom.models.personal.codex.balanced": {
           "type": "string",
           "default": "",
           "description": "Concrete Codex model for the balanced tier. Empty = provider default."
         },
-        "agentRoom.models.codex.deepReasoning": {
+        "agentRoom.models.personal.codex.deepReasoning": {
           "type": "string",
           "default": "",
           "description": "Concrete Codex model for the deepReasoning tier. Empty = provider default."
         },
-        "agentRoom.models.codex.coding": {
+        "agentRoom.models.personal.codex.coding": {
           "type": "string",
           "default": "",
           "description": "Concrete Codex model for the coding tier. Empty = provider default."
         },
-        "agentRoom.models.openAiWebSearch.research": {
+        "agentRoom.models.personal.webResearch.research": {
           "type": "string",
           "default": "",
           "description": "OpenAI model used by the optional Web Research provider. Empty = not configured."

@@ -52,6 +52,66 @@ test("prompt includes participants, agent identity, roles, workflow step, and la
   assert.match(prompt.prompt, /Build the extension/);
 });
 
+test("prompt states operating mode, provider identity, effort advisory, and warnings (§11)", () => {
+  const agent = defaultVirtualAgents().find((entry) => entry.id === "atlas");
+  const provider = defaultProviders().find((entry) => entry.id === "claudeCodeCli");
+  assert.ok(agent);
+  assert.ok(provider);
+
+  const prompt = buildPrompt({
+    agent,
+    provider,
+    roles: builtInRoles().filter((role) => agent.assignedRoleIds.includes(role.id)),
+    participants: [{ displayName: "Atlas", providerName: "Claude Code", roleNames: ["Planner"] }],
+    workflowName: "Manual",
+    safetyMode: "readOnly",
+    safetyInstruction: "Read only.",
+    modelTier: "balanced",
+    operatingMode: "personalLocal",
+    effortLevel: "high",
+    providerWarnings: ["stream-json is not supported by this Claude CLI; degraded to json output."],
+    contextChips: [],
+    transcript: [],
+    latestUserMessage: "Hello",
+    workspace: {},
+    maxPromptChars: 20_000
+  }).prompt;
+
+  assert.match(prompt, /Operating mode: Personal Mode/);
+  assert.match(prompt, /Your backend provider: Claude Code/);
+  assert.match(prompt, /Effort level is HIGH/);
+  assert.match(prompt, /Warnings:\n- stream-json is not supported/);
+});
+
+test("Work Mode prompt states the partition explicitly", () => {
+  const agents = defaultVirtualAgents("workCopilotNative");
+  const providers = defaultProviders("workCopilotNative");
+  const agent = agents.find((entry) => entry.id === "atlas");
+  const provider = providers.find((entry) => entry.id === "copilotNative");
+  assert.ok(agent);
+  assert.ok(provider);
+
+  const prompt = buildPrompt({
+    agent,
+    provider,
+    roles: builtInRoles().filter((role) => agent.assignedRoleIds.includes(role.id)),
+    participants: [],
+    workflowName: "Manual",
+    safetyMode: "readOnly",
+    safetyInstruction: "Read only.",
+    modelTier: "providerDefault",
+    operatingMode: "workCopilotNative",
+    contextChips: [],
+    transcript: [],
+    latestUserMessage: "Hello",
+    workspace: {},
+    maxPromptChars: 20_000
+  }).prompt;
+
+  assert.match(prompt, /Operating mode: Work Mode/);
+  assert.match(prompt, /local personal CLI providers do not exist here/);
+});
+
 test("prompt respects maxPromptChars and truncates older transcript first", () => {
   const agent = defaultVirtualAgents().find((entry) => entry.id === "atlas");
   const provider = defaultProviders().find((entry) => entry.id === "claudeCodeCli");

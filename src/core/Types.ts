@@ -38,6 +38,8 @@ export type ModelTier =
   | "research"
   | "userSelected";
 
+export type EffortLevel = "low" | "medium" | "high" | "max";
+
 export type SafetyMode = "readOnly" | "workspaceWriteWithApproval" | "dangerous";
 
 export type ContextMode =
@@ -73,6 +75,8 @@ export interface VirtualAgent {
   assignedRoleIds: RoleId[];
   systemInstructions?: string;
   preferredModelTier?: ModelTier;
+  /** Default effort for this team member's turns (SPEC §5, §6). */
+  effortLevel?: EffortLevel;
 }
 
 export interface WorkflowStep {
@@ -203,7 +207,10 @@ export type TaskCategory =
   | "webResearch"
   | "claimVerification"
   | "fullBuildCycle"
-  | "adversarialReview";
+  | "adversarialReview"
+  | "copilotCustomAgentGeneration"
+  | "copilotIntegrationCheck"
+  | "operatingModeSelection";
 
 export interface AdvisorAgentPlanEntry {
   agentId: VirtualAgentId;
@@ -211,11 +218,13 @@ export interface AdvisorAgentPlanEntry {
   providerId: ProviderId;
   roleNames: string[];
   modelTier: ModelTier;
+  effortLevel: EffortLevel;
 }
 
 export interface ModelAdvisorRecommendation {
   id: string;
   category: TaskCategory;
+  operatingMode: OperatingMode;
   workflowId: WorkflowId;
   workflowName: string;
   agentPlan: AdvisorAgentPlanEntry[];
@@ -227,11 +236,22 @@ export interface ModelAdvisorRecommendation {
   requiresConfirmation: boolean;
 }
 
-/** Model tier -> concrete model name mappings from user settings. */
+/** Model tier -> concrete model name mappings from user settings (SPEC §15). */
 export interface ModelTierMappings {
-  claude: { fast: string; balanced: string; deepReasoning: string; coding: string };
-  codex: { fast: string; balanced: string; deepReasoning: string; coding: string };
-  openAiWebSearch: { research: string };
+  work: {
+    providerDefault: string;
+    fast: string;
+    balanced: string;
+    deepReasoning: string;
+    coding: string;
+    review: string;
+    testing: string;
+  };
+  personal: {
+    claude: { fast: string; balanced: string; deepReasoning: string; coding: string };
+    codex: { fast: string; balanced: string; deepReasoning: string; coding: string };
+    webResearch: { research: string };
+  };
 }
 
 export interface ModelAdvisorSettings {

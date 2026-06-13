@@ -96,7 +96,8 @@ export function defaultVirtualAgents(mode: OperatingMode = DEFAULT_OPERATING_MOD
       providerId: planningProvider,
       enabled: true,
       assignedRoleIds: [ROLE_IDS.planner, ROLE_IDS.architect, ROLE_IDS.explainer],
-      preferredModelTier: "balanced"
+      preferredModelTier: "balanced",
+      effortLevel: "high"
     },
     {
       id: AGENT_IDS.forge,
@@ -105,7 +106,8 @@ export function defaultVirtualAgents(mode: OperatingMode = DEFAULT_OPERATING_MOD
       providerId: codingProvider,
       enabled: true,
       assignedRoleIds: [ROLE_IDS.coder, ROLE_IDS.documentationWriter],
-      preferredModelTier: "coding"
+      preferredModelTier: "coding",
+      effortLevel: "high"
     },
     {
       id: AGENT_IDS.sentinel,
@@ -118,7 +120,8 @@ export function defaultVirtualAgents(mode: OperatingMode = DEFAULT_OPERATING_MOD
         ROLE_IDS.securityAuditor,
         ROLE_IDS.codeQualityAuditor
       ],
-      preferredModelTier: "review"
+      preferredModelTier: "review",
+      effortLevel: "high"
     },
     {
       id: AGENT_IDS.gauge,
@@ -127,7 +130,8 @@ export function defaultVirtualAgents(mode: OperatingMode = DEFAULT_OPERATING_MOD
       providerId: testingProvider,
       enabled: true,
       assignedRoleIds: [ROLE_IDS.tester, ROLE_IDS.devOpsReviewer],
-      preferredModelTier: "testing"
+      preferredModelTier: "testing",
+      effortLevel: "medium"
     },
     {
       id: AGENT_IDS.scout,

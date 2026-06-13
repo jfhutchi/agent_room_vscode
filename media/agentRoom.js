@@ -309,14 +309,20 @@
     const actions = document.createElement("div");
     actions.className = "advisor-actions";
     const use = document.createElement("button");
-    use.textContent = "Use recommendation";
+    use.textContent = recommendation.requiresConfirmation
+      ? "Confirm and use recommendation"
+      : "Use recommendation";
     use.addEventListener("click", () => {
-      post({ type: "runWorkflow", workflowId: recommendation.workflowId, text: el.text.value });
+      post({ type: "applyModelAdvisorRecommendation", recommendationId: recommendation.id });
+      el.advisor.classList.add("hidden");
     });
     const ignore = document.createElement("button");
     ignore.className = "secondary";
     ignore.textContent = "Ignore";
-    ignore.addEventListener("click", () => el.advisor.classList.add("hidden"));
+    ignore.addEventListener("click", () => {
+      post({ type: "ignoreModelAdvisorRecommendation", recommendationId: recommendation.id });
+      el.advisor.classList.add("hidden");
+    });
     actions.append(use, ignore);
     el.advisor.append(title, body, actions);
   }

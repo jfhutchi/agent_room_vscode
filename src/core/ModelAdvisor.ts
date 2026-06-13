@@ -1,5 +1,6 @@
 import {
   AdvisorAgentPlanEntry,
+  EffortLevel,
   ModelAdvisorRecommendation,
   ModelAdvisorSettings,
   ModelTier,
@@ -12,7 +13,11 @@ import { VirtualTeamRegistry } from "./VirtualTeamRegistry";
 import { WorkflowRegistry, WORKFLOW_IDS } from "./WorkflowRegistry";
 import { WorkflowRunner } from "./WorkflowRunner";
 import { defaultProviders } from "./VirtualTeamRegistry";
-import { DEFAULT_OPERATING_MODE, type OperatingMode } from "./OperatingMode";
+import {
+  DEFAULT_OPERATING_MODE,
+  separationGuardMessage,
+  type OperatingMode
+} from "./OperatingMode";
 
 export interface ModelAdvisorOptions {
   team: VirtualTeamRegistry;
@@ -54,13 +59,25 @@ export class ModelAdvisor {
       }
     }
 
+    // §6 separation guard: when the prompt asks for providers on the other
+    // side of the partition, explain the partition instead of suggesting them.
+    this.addSeparationGuard(text, warnings);
+
+    // §6: confirm before deep-reasoning tiers and high/max effort when the
+    // setting requires it.
     const requiresConfirmation =
       this.options.settings.confirmBeforeDeepReasoning &&
-      agentPlan.some((entry) => entry.modelTier === "deepReasoning");
+      agentPlan.some(
+        (entry) =>
+          entry.modelTier === "deepReasoning" ||
+          entry.effortLevel === "high" ||
+          entry.effortLevel === "max"
+      );
 
     return {
       id: `recommendation-${Date.now()}`,
       category,
+      operatingMode: this.operatingMode(),
       workflowId: workflow.id,
       workflowName: workflow.name,
       agentPlan,
@@ -70,7 +87,7 @@ export class ModelAdvisor {
           ? "readOnly"
           : "workspaceWriteWithApproval",
       useWebResearch,
-      reasoning: this.reasoningFor(category, workflow.name),
+      reasoning: this.reasoningFor(category, workflow.name, agentPlan),
       warnings,
       requiresConfirmation
     };
@@ -78,6 +95,17 @@ export class ModelAdvisor {
 
   private categorize(text: string): TaskCategory {
     const lower = text.toLowerCase();
+    // Copilot and mode questions are routed before the generic verbs so
+    // "generate copilot custom agents" never reads as a build request.
+    if (/copilot/.test(lower) && /(custom agent|\.agent\.md|agents? file)/.test(lower)) {
+      return "copilotCustomAgentGeneration";
+    }
+    if (/copilot/.test(lower) && /(capabilit|integration|support|available|detect)/.test(lower)) {
+      return "copilotIntegrationCheck";
+    }
+    if (/(work mode|personal mode|operating mode|which mode|switch mode)/.test(lower)) {
+      return "operatingModeSelection";
+    }
     if (/(latest|current|docs|documentation|source|web|research)/.test(lower)) return "webResearch";
     if (/(security|audit|vulnerability|secret|credential|injection)/.test(lower)) return "securityReview";
     if (/(build|implement|create|add|fix|complete|extension|feature)/.test(lower)) return "fullBuildCycle";
@@ -89,6 +117,11 @@ export class ModelAdvisor {
 
   private workflowFor(category: TaskCategory): string {
     switch (category) {
+      case "copilotCustomAgentGeneration":
+        return WORKFLOW_IDS.copilotCustomAgentSync;
+      case "copilotIntegrationCheck":
+      case "operatingModeSelection":
+        return WORKFLOW_IDS.modeSetupProviderCheck;
       case "webResearch":
         return WORKFLOW_IDS.researchPlanReviewCode;
       case "securityReview":
@@ -104,6 +137,19 @@ export class ModelAdvisor {
         return WORKFLOW_IDS.planReview;
       default:
         return WORKFLOW_IDS.manual;
+    }
+  }
+
+  private addSeparationGuard(text: string, warnings: string[]): void {
+    const lower = text.toLowerCase();
+    const mode = this.operatingMode();
+    const asksForPersonal = /claude\s*(code)?\s*cli|codex\s*cli|local\s+(claude|codex)/.test(lower);
+    const asksForCopilot = /copilot/.test(lower);
+    if (mode === "workCopilotNative" && asksForPersonal) {
+      warnings.push(separationGuardMessage(mode));
+    }
+    if (mode === "personalLocal" && asksForCopilot) {
+      warnings.push(separationGuardMessage(mode));
     }
   }
 
@@ -138,7 +184,8 @@ export class ModelAdvisor {
       displayName: agent.displayName,
       providerId: agent.providerId,
       roleNames: roles.map((role) => role.name),
-      modelTier: this.modelTierFor(agent)
+      modelTier: this.modelTierFor(agent),
+      effortLevel: this.effortLevelFor(agent)
     };
   }
 
@@ -148,8 +195,24 @@ export class ModelAdvisor {
     return agent.preferredModelTier ?? "providerDefault";
   }
 
-  private reasoningFor(category: TaskCategory, workflowName: string): string {
-    return `Classified as ${category}; recommended ${workflowName} with assigned role holders.`;
+  private effortLevelFor(agent: VirtualAgent): EffortLevel {
+    if (this.options.settings.preferSpeed) return "low";
+    if (this.options.settings.preferQuality) return "high";
+    return agent.effortLevel ?? "medium";
+  }
+
+  /** Mode-aware reasoning matching the §6 example shapes. */
+  private reasoningFor(
+    category: TaskCategory,
+    workflowName: string,
+    agentPlan: AdvisorAgentPlanEntry[]
+  ): string {
+    const participants = agentPlan.map((entry) => entry.displayName).join(", ") || "the Conductor";
+    return this.operatingMode() === "workCopilotNative"
+      ? `This looks like a ${category} task in a work repository. I recommend Work Mode's ` +
+          `${workflowName} with ${participants} using company-approved Copilot models.`
+      : `This looks like a personal ${category} task. I recommend ${workflowName} with ` +
+          `${participants} through your local Claude Code and Codex CLI logins.`;
   }
 
   private operatingMode(): OperatingMode {

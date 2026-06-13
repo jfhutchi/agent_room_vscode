@@ -6,6 +6,7 @@
 
 import {
   AgentDiagnostics,
+  EffortLevel,
   ModelTier,
   ProviderId,
   ProviderKind,
@@ -60,10 +61,14 @@ export interface ProviderHealth {
 export interface ProviderInvocation {
   providerId: ProviderId;
   virtualAgentId: VirtualAgentId;
+  /** Mode this invocation was issued under (SPEC §4). */
+  operatingMode?: OperatingMode;
   prompt: string;
   workspaceRoot?: string;
   safetyMode: SafetyMode;
   modelTier: ModelTier;
+  /** Advisory effort for the turn (SPEC §6). */
+  effortLevel?: EffortLevel;
   /** Resolved from the user's tier mappings; undefined = provider default. */
   concreteModelName?: string;
   timeoutMs: number;

@@ -13,12 +13,14 @@
 
 import {
   AgentRoomMessage,
+  EffortLevel,
   ModelTier,
   ProviderProfile,
   RoleDefinition,
   SafetyMode,
   VirtualAgent
 } from "./Types";
+import { modeName, type OperatingMode } from "./OperatingMode";
 
 export interface PromptParticipantSummary {
   displayName: string;
@@ -38,6 +40,12 @@ export interface PromptBuildInput {
   safetyMode: SafetyMode;
   safetyInstruction: string;
   modelTier: ModelTier;
+  /** Operating mode of the room (SPEC §11: every turn states it). */
+  operatingMode?: OperatingMode;
+  /** Advisory effort level (SPEC §6): prompt text where no real control exists. */
+  effortLevel?: EffortLevel;
+  /** Provider/mode warnings surfaced to the agent (SPEC §11). */
+  providerWarnings?: string[];
   contextChips: string[];
   /** Oldest -> newest; must NOT include the latest user message. */
   transcript: AgentRoomMessage[];
@@ -67,6 +75,13 @@ export interface BuiltPrompt {
 }
 
 const TRUNCATION_NOTE = "[Context truncated by Agent Room to fit configured prompt budget.]";
+
+const EFFORT_ADVISORY: Record<EffortLevel, string> = {
+  low: "Effort level is LOW: prefer a quick, concise answer over exhaustive analysis.",
+  medium: "Effort level is MEDIUM: balance thoroughness with brevity.",
+  high: "Effort level is HIGH: think carefully, be thorough, and double-check your conclusions.",
+  max: "Effort level is MAX: apply maximum care and rigor; do not cut corners."
+};
 
 const RULES = `Rules:
 - Be honest about what you can and cannot see.
@@ -104,6 +119,14 @@ export function buildPrompt(input: PromptBuildInput): BuiltPrompt {
 
   const header = [
     "You are participating in a shared VS Code Agent Room.",
+    ...(input.operatingMode
+      ? [
+          `Operating mode: ${modeName(input.operatingMode)}` +
+            (input.operatingMode === "workCopilotNative"
+              ? " — company-approved Copilot capabilities only; local personal CLI providers do not exist here."
+              : " — local Claude Code / Codex CLI logins; no GitHub Copilot dependency.")
+        ]
+      : []),
     "",
     "Participants:",
     participantLines,
@@ -143,6 +166,10 @@ export function buildPrompt(input: PromptBuildInput): BuiltPrompt {
     input.safetyInstruction,
     "",
     `Model tier:\n${input.modelTier === "providerDefault" ? "provider default" : input.modelTier}`,
+    ...(input.effortLevel ? ["", EFFORT_ADVISORY[input.effortLevel]] : []),
+    ...(input.providerWarnings?.length
+      ? ["", "Warnings:", ...input.providerWarnings.map((warning) => `- ${warning}`)]
+      : []),
     "",
     `Active context:\n${input.contextChips.length ? input.contextChips.join(", ") : "none"}`
   ].join("\n");

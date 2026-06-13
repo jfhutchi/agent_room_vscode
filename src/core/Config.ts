@@ -53,20 +53,31 @@ export function getAgentRoomSettings(): AgentRoomSettings {
       confirmBeforeDeepReasoning: get(config, "modelAdvisor.confirmBeforeDeepReasoning", true)
     },
     models: {
-      claude: {
-        fast: get(config, "models.claude.fast", ""),
-        balanced: get(config, "models.claude.balanced", ""),
-        deepReasoning: get(config, "models.claude.deepReasoning", ""),
-        coding: get(config, "models.claude.coding", "")
+      work: {
+        providerDefault: get(config, "models.work.providerDefault", ""),
+        fast: get(config, "models.work.fast", ""),
+        balanced: get(config, "models.work.balanced", ""),
+        deepReasoning: get(config, "models.work.deepReasoning", ""),
+        coding: get(config, "models.work.coding", ""),
+        review: get(config, "models.work.review", ""),
+        testing: get(config, "models.work.testing", "")
       },
-      codex: {
-        fast: get(config, "models.codex.fast", ""),
-        balanced: get(config, "models.codex.balanced", ""),
-        deepReasoning: get(config, "models.codex.deepReasoning", ""),
-        coding: get(config, "models.codex.coding", "")
-      },
-      openAiWebSearch: {
-        research: get(config, "models.openAiWebSearch.research", "")
+      personal: {
+        claude: {
+          fast: get(config, "models.personal.claude.fast", ""),
+          balanced: get(config, "models.personal.claude.balanced", ""),
+          deepReasoning: get(config, "models.personal.claude.deepReasoning", ""),
+          coding: get(config, "models.personal.claude.coding", "")
+        },
+        codex: {
+          fast: get(config, "models.personal.codex.fast", ""),
+          balanced: get(config, "models.personal.codex.balanced", ""),
+          deepReasoning: get(config, "models.personal.codex.deepReasoning", ""),
+          coding: get(config, "models.personal.codex.coding", "")
+        },
+        webResearch: {
+          research: get(config, "models.personal.webResearch.research", "")
+        }
       }
     },
     webResearch: {

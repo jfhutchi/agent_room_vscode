@@ -22,8 +22,10 @@ import { CopilotNativeProvider } from "./CopilotNativeProvider";
 import { CopilotCustomAgentProvider } from "./CopilotCustomAgentProvider";
 import { CopilotAgentSessionProvider } from "./CopilotAgentSessionProvider";
 import { providerHealthSummary } from "./ProviderHealth";
+import { resolveConcreteModel } from "./ModelResolution";
 import type { ChatParticipantStatus } from "./ChatParticipant";
 import type { ProviderHealth as ProviderHealthInfo } from "./ProviderTypes";
+import type { ModelAdvisorRecommendation } from "./Types";
 import { CodexCliProvider } from "./CodexCliProvider";
 import { Conductor, typingIndicatorFor } from "./Conductor";
 import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
@@ -81,6 +83,11 @@ export class AgentRoomController {
   private runGeneration = 0;
   private selectedWorkflowId = "manual";
   private safetyMode: SafetyMode = "workspaceWriteWithApproval";
+  /** Recent advisor recommendations by id, with the prompt that produced them. */
+  private readonly pendingRecommendations = new Map<
+    string,
+    { recommendation: ModelAdvisorRecommendation; text: string }
+  >();
   private contextChips: Record<ContextChipId, boolean> = {
     selection: true,
     currentFile: false,
@@ -539,9 +546,36 @@ export class AgentRoomController {
         await this.checkCopilotCapabilities();
         return;
       case "applyModelAdvisorRecommendation":
+        await this.applyRecommendation(message.recommendationId);
+        return;
       case "ignoreModelAdvisorRecommendation":
+        this.pendingRecommendations.delete(message.recommendationId);
         return;
     }
+  }
+
+  private rememberRecommendation(recommendation: ModelAdvisorRecommendation, text: string): void {
+    this.pendingRecommendations.set(recommendation.id, { recommendation, text });
+    // Keep the map small; only recent recommendations are actionable.
+    while (this.pendingRecommendations.size > 10) {
+      const oldest = this.pendingRecommendations.keys().next().value;
+      if (oldest === undefined) break;
+      this.pendingRecommendations.delete(oldest);
+    }
+  }
+
+  /** Clicking Apply in the webview is the user's explicit confirmation (§6). */
+  private async applyRecommendation(recommendationId: string): Promise<void> {
+    const pending = this.pendingRecommendations.get(recommendationId);
+    if (!pending) {
+      await this.addConductorMessage(
+        "That recommendation is no longer available. Send the request again for a fresh one.",
+        "error"
+      );
+      return;
+    }
+    this.pendingRecommendations.delete(recommendationId);
+    await this.runWorkflow(pending.recommendation.workflowId, pending.text, false);
   }
 
   private async handleUserMessage(text: string, replyToMessageId?: string): Promise<void> {
@@ -550,6 +584,7 @@ export class AgentRoomController {
     if (this.settings.modelAdvisor.enabled) {
       const advisor = this.createAdvisor();
       const recommendation = advisor.recommend(text);
+      this.rememberRecommendation(recommendation, text);
       await this.addConductorMessage(new Conductor().recommendationText(recommendation));
       await this.panel?.post({ type: "modelAdvisorRecommendation", recommendation });
       if (this.settings.modelAdvisor.autoApply && !recommendation.requiresConfirmation) {
@@ -693,6 +728,7 @@ export class AgentRoomController {
     });
 
     try {
+      const operatingMode = this.requireOperatingMode();
       const result = await runAgentTurn({
         providerRegistry,
         agent,
@@ -708,6 +744,14 @@ export class AgentRoomController {
         expectedOutput: options.expectedOutput,
         safetyMode: this.safetyMode,
         safetyInstruction: safety.instructionFor(this.safetyMode),
+        operatingMode,
+        effortLevel: agent.effortLevel,
+        concreteModelName: resolveConcreteModel(
+          this.settings.models,
+          operatingMode,
+          agent.providerId,
+          agent.preferredModelTier ?? "providerDefault"
+        ),
         timeoutMs: this.settings.agentTimeoutSeconds * 1000,
         maxPromptChars: this.settings.maxPromptChars,
         abortSignal: runAbortController.signal

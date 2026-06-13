@@ -893,9 +893,31 @@ export class AgentRoomController {
       await this.panel?.post({ type: "modelAdvisorRecommendation", recommendation });
       if (this.settings.modelAdvisor.autoApply && !recommendation.requiresConfirmation) {
         await this.runWorkflow(recommendation.workflowId, text, false);
+        await this.hydrate();
+        return;
       }
     }
+    // A plain message gets an actual reply from a team member, so the room
+    // responds. (Run Workflow runs the selected workflow; Start Build is the
+    // autonomous orchestration.)
+    await this.respondWithDefaultAgent(text);
     await this.hydrate();
+  }
+
+  /** Route a plain chat message to one enabled, provider-backed agent for a reply. */
+  private async respondWithDefaultAgent(text: string): Promise<void> {
+    const team = new VirtualTeamRegistry(this.requireProfile().virtualAgents);
+    const agent = team
+      .enabledAgents()
+      .find((entry) => entry.providerId !== "human" && entry.providerId !== "internalConductor");
+    if (!agent) {
+      await this.addConductorMessage(
+        "No provider-backed team member is enabled to answer. Open Room Setup to enable one, or use Run Workflow / Start Build.",
+        "error"
+      );
+      return;
+    }
+    await this.runAgent(agent, text, { workflowName: "Manual" });
   }
 
   private async sendToAgent(agentId: string, text: string, replyToMessageId?: string): Promise<void> {

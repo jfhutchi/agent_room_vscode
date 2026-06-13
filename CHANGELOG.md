@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 — 2026-06-13
+
+- **Send now gets a reply.** A plain message routed through Send was only logged
+  (plus a workflow suggestion) and no agent answered. Send now routes to an enabled
+  team member for a response. Run Workflow still runs the selected workflow; Start Build
+  is the autonomous orchestration.
+
 ## 0.2.1 — 2026-06-13
 
 - **Fix CLI invocation for current CLI versions** (found in live testing): drop

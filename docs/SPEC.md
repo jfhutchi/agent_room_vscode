@@ -6,6 +6,15 @@ A VS Code-native multi-agent coding room where Claude Code and Codex collaborate
 This document is the source of truth for what Agent Room must become. It is implemented
 **in phases across multiple agent sessions** (see `PROMPTS.md`), never in one run.
 
+> **Direction update (2026-06-13):** the product owner adopted a refined architecture —
+> an **autonomous multi-agent orchestration engine** (debate → adversarial review →
+> approval-gated execution) with a propose→approve→execute safety model and append-only
+> audit log. The authoritative plan now lives in **`docs/ORCHESTRATION_PLAN.md`**; this
+> file remains the source for the provider/role/safety/webview foundations it builds on.
+> Notable reversals from below, logged in `docs/SPEC_DEVIATIONS.md` (entry 9): **Work
+> Mode is tabled** (single-mode, Personal/local-CLI for now) and **no local-model/ollama
+> runtime for now** (claude-cli + codex-cli only).
+
 ---
 
 ## 0. Authority & Conflict Resolution

@@ -119,3 +119,29 @@ user would see `@agent-room` in the picker and get a VS Code "participant not
 registered" error when invoking it. Attaching a handler that politely says "disabled"
 preserves the setting's intent (no Level 2 behavior unless opted in) without shipping
 a broken-looking default experience.
+
+## 9. Direction change: orchestration engine; Work Mode tabled; no ollama (2026-06-13)
+
+**What:** The product owner adopted a refined architecture (see
+`docs/ORCHESTRATION_PLAN.md`, drawn from a claude.ai/design engineering spec + chat
+mockup). Three concrete reversals of the spec above:
+
+1. **Single mode for now — Work Mode is tabled.** SPEC §3.4 mandates a permanent
+   Work/Personal hard partition with no mixed mode. The product is now Personal-only
+   (local Claude + Codex CLIs); the Work Mode / Copilot subsystem (Phases 3–5) stays in
+   the tree but **dormant and unreachable from the new orchestration path**, to be
+   removed in a cleanup pass after Stages 2–3 (the owner chose "build first, delete
+   after," and intends a separate work-oriented orchestrator later).
+2. **No local-model / ollama runtime for now.** The design mockup showed a
+   `qwen2.5-coder · ollama` runtime; the owner cut it. Runtimes are claude-cli and
+   codex-cli only.
+3. **Execution model shifts to propose→approve→execute.** The orchestration engine adds
+   an approval gate (SAFE/RISKY/BLOCKED) and an append-only audit log: agents emit
+   `ActionProposal`s and the engine performs side effects only after a human
+   `ApprovalDecision`. This is additive to, and stricter than, the §17 safety posture.
+
+**Why:** Owner decision (Final Approver, SPEC §0). The orchestration vision is the real
+product; Work Mode and ollama don't serve the near-term path and were explicitly
+deferred/cut. The approval-gate model strengthens, not weakens, the spec's conservative
+safety intent. The two-mode partition is preserved in code until the post-Stage-3
+cleanup so nothing tested is thrown away prematurely.

@@ -11,6 +11,13 @@ import {
   type CustomAgentSyncPlan,
   type CustomAgentSyncResult
 } from "./CopilotCustomAgentGenerator";
+import {
+  COPILOT_CHAT_EXTENSION_ID,
+  COPILOT_EXTENSION_ID,
+  describeCopilotCapabilities,
+  detectCopilotCapabilities
+} from "./CopilotIntegration";
+import { CopilotNativeProvider } from "./CopilotNativeProvider";
 import { CodexCliProvider } from "./CodexCliProvider";
 import { Conductor } from "./Conductor";
 import { OpenAiWebSearchProvider } from "./OpenAiWebSearchProvider";
@@ -37,7 +44,6 @@ import { collectWorkspaceContext } from "./WorkspaceContext";
 import { runAgentTurn } from "./AgentRunner";
 import { checkProviderHealth } from "./HealthCheck";
 import {
-  COPILOT_AGENT_SESSION_LIMITATION,
   FIRST_LAUNCH_MODE_PICKER_ITEMS,
   OperatingModeManager,
   SWITCH_MODE_PICKER_ITEMS,
@@ -387,15 +393,26 @@ export class AgentRoomController {
   }
 
   /**
-   * Honest stub until Phase 5 lands real capability detection: reports what
-   * works today (custom agent generation) and the canonical §3.2 limitation
-   * for direct session orchestration. No fake capability claims.
+   * Real capability detection (SPEC §7, §0.4): runtime extension probing
+   * plus typings-verified API checks. Honest false beats fake true — the
+   * agent-session flags are hard false in CopilotIntegration.ts.
    */
   async checkCopilotCapabilities(): Promise<void> {
-    await vscode.window.showInformationMessage(
-      "Agent Room can generate Copilot custom agent files today. Full Copilot capability " +
-        `detection arrives in a later phase. ${COPILOT_AGENT_SESSION_LIMITATION}`
-    );
+    const capabilities = detectCopilotCapabilities({
+      copilotExtensionDetected: vscode.extensions.getExtension(COPILOT_EXTENSION_ID) !== undefined,
+      copilotChatDetected: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
+      chatParticipantApiAvailable: typeof vscode.chat?.createChatParticipant === "function",
+      languageModelApiAvailable: typeof vscode.lm?.selectChatModels === "function",
+      workspaceOpen: this.workspaceRoot() !== undefined
+    });
+    await this.panel?.post({ type: "copilotCapabilitiesUpdated", capabilities });
+    const summary = describeCopilotCapabilities(capabilities);
+    if (this.panel && this.operatingMode) {
+      await this.addConductorMessage(`${summary}\n${capabilities.limitations.join("\n")}`);
+      await this.hydrate();
+    } else {
+      await vscode.window.showInformationMessage(summary);
+    }
   }
 
   private async handleWebviewMessage(message: WebviewToExtensionMessage): Promise<void> {
@@ -855,9 +872,21 @@ export class AgentRoomController {
     if (operatingMode === "workCopilotNative") {
       // SPEC §3.4: in Work Mode the personal providers (claudeCodeCli,
       // codexCli, openAiWebSearch) are never constructed or registered.
-      // Runnable Copilot providers arrive in a later phase, so the Work Mode
-      // registry is honestly empty rather than faking Copilot execution.
-      return new ProviderRegistry([], operatingMode);
+      // copilotNative runs through the public Language Model API only.
+      return new ProviderRegistry([
+        new CopilotNativeProvider({
+          selectChatModels: (selector) => vscode.lm.selectChatModels(selector),
+          createUserMessage: (content) => vscode.LanguageModelChatMessage.User(content),
+          createCancellation: () => {
+            const source = new vscode.CancellationTokenSource();
+            return {
+              token: source.token,
+              cancel: () => source.cancel(),
+              dispose: () => source.dispose()
+            };
+          }
+        })
+      ], operatingMode);
     }
     return new ProviderRegistry([
       new ClaudeCodeProvider({

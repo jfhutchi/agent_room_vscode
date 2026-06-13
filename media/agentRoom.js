@@ -12,7 +12,8 @@
     safetyMode: "workspaceWriteWithApproval",
     contextChips: { selection: true, currentFile: false, gitStatus: true },
     setupOpen: false,
-    latestRecommendation: null
+    latestRecommendation: null,
+    copilotCapabilities: null
   };
 
   const el = {
@@ -31,7 +32,11 @@
     text: document.getElementById("composerText"),
     chipSelection: document.getElementById("chipSelection"),
     chipCurrentFile: document.getElementById("chipCurrentFile"),
-    chipGitStatus: document.getElementById("chipGitStatus")
+    chipGitStatus: document.getElementById("chipGitStatus"),
+    copilotPanel: document.getElementById("copilotPanel"),
+    copilotCapabilities: document.getElementById("copilotCapabilities"),
+    copilotLimitations: document.getElementById("copilotLimitations"),
+    copilotCheckButton: document.getElementById("copilotCheckButton")
   };
 
   function post(message) {
@@ -76,6 +81,41 @@
   function renderMode() {
     el.modeTitle.textContent = text(state.operatingModeTitle);
     el.modeDescription.textContent = text(state.operatingModeDescription);
+    // The Copilot panel lives in Work Mode; a capabilities report opens it anywhere.
+    if (state.operatingMode === "workCopilotNative" || state.copilotCapabilities) {
+      el.copilotPanel.classList.remove("hidden");
+    } else {
+      el.copilotPanel.classList.add("hidden");
+    }
+  }
+
+  function renderCopilotCapabilities() {
+    const capabilities = state.copilotCapabilities;
+    el.copilotCapabilities.textContent = "";
+    el.copilotLimitations.textContent = "";
+    if (!capabilities) return;
+    const flags = [
+      ["Copilot extension", capabilities.copilotExtensionDetected],
+      ["Copilot Chat", capabilities.copilotChatDetected],
+      ["Custom agent generation", capabilities.canCreateCustomAgents],
+      ["Chat participant API", capabilities.canRegisterChatParticipant],
+      ["Direct agent sessions", capabilities.canInvokeCopilotAgentSession],
+      ["Third-party agent sessions", capabilities.canInvokeThirdPartyAgentSession],
+      ["Read session transcripts", capabilities.canReadAgentSessionTranscript],
+      ["Render sessions in webview", capabilities.canRenderAgentSessionInCustomWebview],
+      ["Manage Copilot CLI sessions", capabilities.canManageCopilotCliSessions]
+    ];
+    for (const [label, value] of flags) {
+      const chip = document.createElement("div");
+      chip.className = `health-chip ${value ? "ready" : "missing"}`;
+      chip.textContent = `${label}: ${value ? "yes" : "no"}`;
+      el.copilotCapabilities.appendChild(chip);
+    }
+    for (const limitation of capabilities.limitations || []) {
+      const item = document.createElement("li");
+      item.textContent = limitation;
+      el.copilotLimitations.appendChild(item);
+    }
   }
 
   function renderWorkflows() {
@@ -246,6 +286,7 @@
     renderTeam();
     renderRoleMatrix();
     renderTranscript();
+    renderCopilotCapabilities();
   }
 
   window.addEventListener("message", (event) => {
@@ -273,6 +314,11 @@
       state.health = message.health || {};
       renderHealth();
     }
+    if (message.type === "copilotCapabilitiesUpdated") {
+      state.copilotCapabilities = message.capabilities || null;
+      el.copilotPanel.classList.remove("hidden");
+      renderCopilotCapabilities();
+    }
     if (message.type === "modelAdvisorRecommendation") {
       renderAdvisor(message.recommendation);
     }
@@ -287,6 +333,7 @@
   });
 
   document.getElementById("healthButton").addEventListener("click", () => post({ type: "checkHealth" }));
+  el.copilotCheckButton.addEventListener("click", () => post({ type: "checkCopilotCapabilities" }));
   el.setupButton.addEventListener("click", () => {
     state.setupOpen = !state.setupOpen;
     el.setup.classList.toggle("hidden", !state.setupOpen);

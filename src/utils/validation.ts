@@ -227,7 +227,8 @@ export type ExtensionToWebviewMessageType =
   | "settingsUpdated"
   | "exportComplete"
   | "profileUpdated"
-  | "modelAdvisorRecommendation";
+  | "modelAdvisorRecommendation"
+  | "copilotCapabilitiesUpdated";
 
 export const EXTENSION_TO_WEBVIEW_TYPES: ReadonlySet<string> = new Set<string>([
   "hydrate",
@@ -240,5 +241,6 @@ export const EXTENSION_TO_WEBVIEW_TYPES: ReadonlySet<string> = new Set<string>([
   "settingsUpdated",
   "exportComplete",
   "profileUpdated",
-  "modelAdvisorRecommendation"
+  "modelAdvisorRecommendation",
+  "copilotCapabilitiesUpdated"
 ]);

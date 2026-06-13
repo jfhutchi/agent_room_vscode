@@ -171,6 +171,36 @@ h2 {
   margin-top: 8px;
 }
 
+.copilot-panel {
+  border-bottom: 1px solid var(--room-border);
+  padding: 10px 16px;
+  background: var(--vscode-editorWidget-background);
+}
+
+.copilot-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.copilot-panel-header h2 {
+  font-size: 13px;
+  margin: 0;
+}
+
+.copilot-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.copilot-limitations {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--room-muted);
+}
+
 .setup-panel {
   border-bottom: 1px solid var(--room-border);
   padding: 12px 16px;

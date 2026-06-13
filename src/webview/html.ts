@@ -58,6 +58,15 @@ export function getAgentRoomHtml(webview: vscode.Webview, extensionUri: vscode.U
 
     <section id="advisor" class="advisor hidden" aria-live="polite"></section>
 
+    <section id="copilotPanel" class="copilot-panel hidden" aria-label="Copilot integration">
+      <div class="copilot-panel-header">
+        <h2>Copilot Integration</h2>
+        <button id="copilotCheckButton" type="button">Check Capabilities</button>
+      </div>
+      <div id="copilotCapabilities" class="copilot-capabilities"></div>
+      <ul id="copilotLimitations" class="copilot-limitations"></ul>
+    </section>
+
     <section id="setupPanel" class="setup-panel hidden" aria-label="Room setup">
       <div class="setup-grid">
         <section>

@@ -76,6 +76,11 @@
     if (!state.profile) return;
     el.health.textContent = "";
     for (const provider of state.profile.providers) {
+      // The human (you) and the internal Conductor are always-present
+      // participants, not health-checkable backends — the provider registry
+      // never probes them, so they have no health entry. Skip them instead of
+      // rendering a misleading "missing" chip.
+      if (provider.kind === "human" || provider.kind === "internal") continue;
       const health = state.health[provider.id];
       const chip = document.createElement("div");
       const status = healthState(health, provider);
